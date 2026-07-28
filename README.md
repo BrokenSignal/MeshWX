@@ -3,7 +3,7 @@
 <p align="center">
   <b>Off-grid weather warnings.</b> MeshWX watches the National Weather Service and
   broadcasts the alerts that matter over your <a href="https://meshtastic.org/">Meshtastic</a>
-  and/or <a href="https://meshcore.co.uk/">MeshCore</a> radios - so your mesh keeps getting
+  and/or <a href="https://meshcore.co.uk/">MeshCore</a> radios, so your mesh keeps getting
   tornado, flood, and severe-storm warnings when the cell network and internet are gone.
 </p>
 
