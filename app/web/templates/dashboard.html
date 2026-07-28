@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %} · Dashboard{% endblock %}
+{% block title %} &middot; Dashboard{% endblock %}
 {% block content %}
 {% include "_dash_top.html" %}
 
 <div class="cols">
   <section class="panel" style="padding:0;">
-    <div class="panel-head"><h3>Recent alerts</h3><a class="see" href="/history">View history →</a></div>
+    <div class="panel-head"><h3>Recent alerts</h3><a class="see" href="/history">View history &rarr;</a></div>
     {% for a in recent %}
     <div class="arow">
       <div>
@@ -30,18 +30,18 @@
           <span class="dot {{ 'ok' if t.connected else 'bad' }}">{{ "Connected" if t.connected else "Offline" }}</span>
         </div>
         <div class="node-meta">
-          {{ "USB" if t.conn == "serial" else "Network" }} ·
-          {{ t.target or "not configured" }} · ch {{ t.channel }}
+          {{ "USB" if t.conn == "serial" else "Network" }} &middot;
+          {{ t.target or "not configured" }} &middot; ch {{ t.channel }}
         </div>
         {% if t.error and not t.connected %}<div class="node-err">{{ t.error }}</div>{% endif %}
       </div>
       {% else %}
-      <div class="kv"><span class="k">No radios enabled</span><span class="v"><a class="see" href="/settings">Set up →</a></span></div>
+      <div class="kv"><span class="k">No radios enabled</span><span class="v"><a class="see" href="/settings">Set up &rarr;</a></span></div>
       {% endfor %}
       <div class="kv"><span class="k">Last TX</span><span class="v">{{ last_tx }}</span></div>
     </section>
     <section class="panel" style="padding:0;">
-      <div class="panel-head"><h3>Broadcasting</h3><a class="see" href="/settings">Edit →</a></div>
+      <div class="panel-head"><h3>Broadcasting</h3><a class="see" href="/settings">Edit &rarr;</a></div>
       <div class="chips">
         {% for ev in include %}<span class="chip">{{ ev }}</span>{% endfor %}
       </div>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %} · Transmit Log{% endblock %}
+{% block title %} &middot; Transmit Log{% endblock %}
 {% block content %}
 <h2>Transmit Log</h2>
 <div class="panel" style="padding:0;">
@@ -17,7 +17,7 @@
         <div class="rec-lbl">TX Message</div>
         <div class="rec-msg">{{ r["text"] }}</div>
       </div>
-      <div class="rec-detail">ch {{ r["channel"] }} · {{ r["byte_count"] }} bytes</div>
+      <div class="rec-detail">ch {{ r["channel"] }} &middot; {{ r["byte_count"] }} bytes</div>
     </div>
     {% if r["error"] %}
     <div class="rec-areawrap">

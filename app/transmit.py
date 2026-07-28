@@ -83,11 +83,20 @@ class MeshCoreTransmitter(Transmitter):
         from meshcore import MeshCore  # lazy: optional dependency
         if self._mc is not None:
             await self.close()
+        # default_timeout: cap how long we wait for the device's "OK" confirmation
+        #   (channel broadcasts have no real ACK, so a long wait just stalls sends).
+        # auto_reconnect: let the library recover a dropped USB/TCP link on its own.
         if self.conn == "tcp":
             h, _, p = self.host.partition(":")
-            self._mc = await MeshCore.create_tcp(h, int(p or 4000))
+            self._mc = await MeshCore.create_tcp(
+                h, int(p or 4000), default_timeout=6.0, auto_reconnect=True)
         else:
-            self._mc = await MeshCore.create_serial(self.port, self.baud)
+            self._mc = await MeshCore.create_serial(
+                self.port, self.baud, default_timeout=6.0, auto_reconnect=True)
+        if self._mc is None:
+            raise RuntimeError(
+                "no response from MeshCore node - is it flashed with the USB "
+                "companion firmware (not repeater)?")
 
     async def send_text(self, text: str, channel: int) -> None:
         if self._mc is None:
@@ -95,7 +104,18 @@ class MeshCoreTransmitter(Transmitter):
         from meshcore import EventType
         res = await self._mc.commands.send_chan_msg(channel, text)
         if getattr(res, "type", None) == EventType.ERROR:
-            raise RuntimeError("meshcore error: %s" % getattr(res, "payload", ""))
+            payload = getattr(res, "payload", {}) or {}
+            reason = payload.get("reason") if isinstance(payload, dict) else None
+            # A missing confirmation frame is NOT a delivery failure: a channel
+            # broadcast has no ACK, and the device likely still transmitted it
+            # (the meshcore lib says as much). Treat as best-effort success and
+            # KEEP the link up - otherwise every unconfirmed send tears the radio
+            # down and it flaps offline.
+            if reason in ("no_event_received", "timeout"):
+                logger.warning(
+                    "meshcore: channel send unconfirmed (%s); treating as sent", reason)
+                return
+            raise RuntimeError("meshcore error: %s" % payload)
 
     async def close(self) -> None:
         if self._mc is not None:

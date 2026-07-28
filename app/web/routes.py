@@ -117,7 +117,9 @@ def _dash_ctx(request) -> dict:
     ltx = db.query_transmit_log(limit=1)
     last_tx = "-"
     if ltx:
-        last_tx = ("OK &middot; " if ltx[0]["success"] else "failed &middot; ") + fmt_local(ltx[0]["ts"], tz)
+        # ASCII only: this string is auto-escaped through {{ }}, so a non-ASCII
+        # separator could mojibake depending on charset. Keep it plain.
+        last_tx = ("OK - " if ltx[0]["success"] else "failed - ") + fmt_local(ltx[0]["ts"], tz)
     return {
         "dry_run": bool(db.get_setting("dry_run", True)),
         "connected": tx.connected, "device": device, "tx_error": tx.last_error,
