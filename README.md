@@ -3,7 +3,7 @@
 <p align="center">
   <b>Off-grid weather warnings.</b> MeshWX watches the National Weather Service and
   broadcasts the alerts that matter over your <a href="https://meshtastic.org/">Meshtastic</a>
-  and/or <a href="https://meshcore.co.uk/">MeshCore</a> radios — so your mesh keeps getting
+  and/or <a href="https://meshcore.co.uk/">MeshCore</a> radios - so your mesh keeps getting
   tornado, flood, and severe-storm warnings when the cell network and internet are gone.
 </p>
 
@@ -17,12 +17,12 @@
 > **MeshWX is a supplemental tool, not a certified warning system.** It depends on your
 > internet connection to reach the NWS API, on your hardware, and on LoRa propagation.
 > Do **not** rely on it as your only source of life-safety alerts. Always keep an
-> official channel — a NOAA Weather Radio, wireless emergency alerts, or local sirens.
+> official channel - a NOAA Weather Radio, wireless emergency alerts, or local sirens.
 > Test it in **dry-run mode** before you trust it, and review the settings for your area.
 
 ## Why it exists
 
-When a hurricane or flood takes out the towers, a LoRa mesh often keeps working — but the
+When a hurricane or flood takes out the towers, a LoRa mesh often keeps working - but the
 mesh has no way to *know* a warning was issued. MeshWX bridges that gap: it polls the
 [NWS alerts API](https://www.weather.gov/documentation/services-web-api), decides what's
 worth sending, formats it to fit a LoRa packet, and transmits it to everyone on your
@@ -30,10 +30,10 @@ channel. Built after living through Hurricane Helene's comms blackout.
 
 ## Features
 
-- **Dual radio, side by side.** Run Meshtastic, MeshCore, or **both at once** — every
+- **Dual radio, side by side.** Run Meshtastic, MeshCore, or **both at once** - every
   alert goes to each enabled radio on its own channel. USB or network (WiFi/TCP) per radio.
 - **Dead-simple setup.** Pick your state and check your counties; the NWS zones populate
-  automatically. Choose which alerts to send from checklists — no cryptic codes to type.
+  automatically. Choose which alerts to send from checklists - no cryptic codes to type.
 - **Smart filtering.** Broadcast all Warnings by default; add Watches/Advisories à la carte.
 - **No spam.** Never rebroadcasts the same alert; sends one concise *update* when a warning
   materially changes and a *cancellation* when it clears. Old state auto-expires.
@@ -85,23 +85,23 @@ Manage with `sudo systemctl restart mesh-wx` and `journalctl -u mesh-wx -f`.
 3. Your browser opens to the dashboard automatically. Keep the console window open;
    close it to stop MeshWX.
 
-No Python install required. Windows may warn about an unrecognized app the first time —
+No Python install required. Windows may warn about an unrecognized app the first time -
 "More info → Run anyway" (the build is unsigned).
 
 ## First run
 
 1. Open the dashboard, go to **Settings**.
-2. **Coverage** — pick your state, check your counties.
-3. **What to broadcast** — leave *All Warnings* on; add any watches/advisories you want.
-4. **Radios** — enable Meshtastic and/or MeshCore, choose USB or Network, set the port/channel.
+2. **Coverage** - pick your state, check your counties.
+3. **What to broadcast** - leave *All Warnings* on; add any watches/advisories you want.
+4. **Radios** - enable Meshtastic and/or MeshCore, choose USB or Network, set the port/channel.
 5. Save, then go to **Troubleshoot → Send test** to confirm each radio actually transmits.
 6. When you're confident, turn **dry-run off** on the dashboard to go live.
 
 ### Radio notes
 
-- **Meshtastic** — any Meshtastic device on USB serial or over the network (TCP). The board
+- **Meshtastic** - any Meshtastic device on USB serial or over the network (TCP). The board
   can renumber its serial port on replug; leave the port blank to auto-discover, or set it.
-- **MeshCore** — flash the board with the **USB (companion)** firmware, *not* repeater
+- **MeshCore** - flash the board with the **USB (companion)** firmware, *not* repeater
   firmware. Repeater firmware exposes no serial API, so MeshWX can't drive it.
 
 ## Configuration
@@ -134,6 +134,6 @@ captured NWS alert JSON fixtures under `tests/fixtures/`, with no serial/network
 
 ## License
 
-[MIT](LICENSE) — free to use, modify, and share. Contributions welcome.
+[MIT](LICENSE) - free to use, modify, and share. Contributions welcome.
 
 <p align="center"><sub>Developed by <a href="https://BrokenSignal.tv/MeshWX">BrokenSignal</a></sub></p>

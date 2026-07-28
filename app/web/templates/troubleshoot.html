@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %} Â· Troubleshoot{% endblock %}
+{% block title %} · Troubleshoot{% endblock %}
 {% block content %}
 <h2>Troubleshoot</h2>
 
 <div class="panel">
   <h3>Send test message</h3>
-  <p class="hint">Keys up a radio with <code>[WX] mesh-wx test</code> — always sends,
+  <p class="hint">Keys up a radio with <code>[WX] mesh-wx test</code> - always sends,
     even when broadcasting is paused. Use this to confirm a radio actually transmits
     before you rely on it.</p>
   {% set on = transports | selectattr("enabled") | list %}
@@ -21,7 +21,7 @@
     {% endif %}
   </div>
   {% else %}
-  <p class="hint">No radios enabled — turn one on in <a href="/settings">Settings</a>.</p>
+  <p class="hint">No radios enabled - turn one on in <a href="/settings">Settings</a>.</p>
   {% endif %}
   <div id="test-result" style="margin-top:12px;"></div>
 </div>

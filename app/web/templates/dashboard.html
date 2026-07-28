@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %} Â· Dashboard{% endblock %}
+{% block title %} · Dashboard{% endblock %}
 {% block content %}
 {% include "_dash_top.html" %}
 
 <div class="cols">
   <section class="panel" style="padding:0;">
-    <div class="panel-head"><h3>Recent alerts</h3><a class="see" href="/history">View history â</a></div>
+    <div class="panel-head"><h3>Recent alerts</h3><a class="see" href="/history">View history →</a></div>
     {% for a in recent %}
     <div class="arow">
       <div>
@@ -41,7 +41,7 @@
       <div class="kv"><span class="k">Last TX</span><span class="v">{{ last_tx }}</span></div>
     </section>
     <section class="panel" style="padding:0;">
-      <div class="panel-head"><h3>Broadcasting</h3><a class="see" href="/settings">Edit â</a></div>
+      <div class="panel-head"><h3>Broadcasting</h3><a class="see" href="/settings">Edit →</a></div>
       <div class="chips">
         {% for ev in include %}<span class="chip">{{ ev }}</span>{% endfor %}
       </div>

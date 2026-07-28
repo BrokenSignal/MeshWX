@@ -6,7 +6,7 @@
   <label class="chk"><input type="checkbox" name="counties" value="{{ id }}" {% if id in selected %}checked{% endif %}> {{ name }}</label>
   {% endfor %}
 </div>
-<p class="hint">{{ counties|length }} counties in {{ state }} — check the ones to cover.</p>
+<p class="hint">{{ counties|length }} counties in {{ state }} - check the ones to cover.</p>
 {% elif state %}
 <p class="hint">No counties found for “{{ state }}”.</p>
 {% else %}

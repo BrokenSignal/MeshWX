@@ -1,4 +1,4 @@
-"""Multi-protocol transmit layer — Meshtastic + MeshCore, side by side.
+"""Multi-protocol transmit layer - Meshtastic + MeshCore, side by side.
 
 Each protocol is an independent transport with its own enable flag and
 connection (serial or TCP). TransmitManager fans every outbound message out to
@@ -117,7 +117,7 @@ class Transport:
     enabled: bool
     conn: str                     # "serial" | "tcp"
     channel: int
-    target: str                   # serial path or host — display + "configured?" check
+    target: str                   # serial path or host - display + "configured?" check
     make: object                  # callable() -> Transmitter
     tx: Transmitter | None = None
     connected: bool = False
@@ -258,7 +258,7 @@ class TransmitManager:
     # ---- sending --------------------------------------------------------
     def enqueue(self, text: str, channel: int | None = None) -> bool:
         """Queue an automated transmission (fanned out to all enabled transports).
-        The channel arg is ignored — each transport uses its own configured channel."""
+        The channel arg is ignored - each transport uses its own configured channel."""
         dropped = len(self._queue) == self._queue.maxlen
         self._queue.append(QueueItem(text=text))
         self._queue_event.set()

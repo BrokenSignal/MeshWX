@@ -300,7 +300,7 @@ async def save_settings(
     db.set_setting("filter_include_suffix", ["Warning"] if all_warnings else [])
     db.set_setting("filter_exclude_exact", [])
 
-    # Radios — Meshtastic + MeshCore, each independently enabled.
+    # Radios - Meshtastic + MeshCore, each independently enabled.
     db.set_setting("meshtastic_enabled", bool(meshtastic_enabled))
     db.set_setting("meshtastic_conn", (meshtastic_conn or "serial").strip())
     db.set_setting("meshtastic_host", meshtastic_host.strip())

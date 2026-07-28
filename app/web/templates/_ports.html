@@ -8,7 +8,7 @@
       {% for p in ports %}
       <tr>
         <td class="mono">{{ p.device }}</td>
-        <td class="mono">{{ p.stable_path or "—" }}</td>
+        <td class="mono">{{ p.stable_path or "-" }}</td>
         <td>{{ p.description }}{% if p.vid %}
             <span class="hint">({{ "%04x"|format(p.vid) }}:{{ "%04x"|format(p.pid or 0) }})</span>{% endif %}</td>
         <td><button type="button" class="secondary"

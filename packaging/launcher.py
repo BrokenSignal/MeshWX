@@ -31,7 +31,7 @@ def main() -> None:
     browse_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     url = f"http://{browse_host}:{port}"
     print("=" * 60)
-    print(f"  MeshWX is starting — open {url}")
+    print(f"  MeshWX is starting - open {url}")
     print("  Keep this window open. Close it to stop MeshWX.")
     print("=" * 60)
     threading.Thread(target=_open_browser, args=(url,), daemon=True).start()

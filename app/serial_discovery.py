@@ -1,9 +1,9 @@
 """Serial port discovery for Meshtastic / MeshCore nodes (any hardware).
 
 Two device families are recognised:
-  * USB-UART bridge boards (ESP32: Heltec, LILYGO) — CP210x / CH340 / CH9102,
+  * USB-UART bridge boards (ESP32: Heltec, LILYGO) - CP210x / CH340 / CH9102,
     appearing as /dev/ttyUSB*.
-  * Native-USB boards (nRF52: RAKwireless WisBlock; RP2040; ESP32-S3) — they
+  * Native-USB boards (nRF52: RAKwireless WisBlock; RP2040; ESP32-S3) - they
     appear as /dev/ttyACM* with a Nordic / Adafruit / Seeed / Espressif VID.
 
 Candidates are then probed with the meshtastic library to confirm a live node.
