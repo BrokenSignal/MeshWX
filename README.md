@@ -11,22 +11,32 @@
   Self-hosted · one small web app · runs on a Raspberry Pi, a Windows PC, or Docker · no account, no cloud.
 </p>
 
+<p align="center">
+  <b>Status: Beta (v1.0.0-beta).</b> Tested on a Heltec V3 (Meshtastic) and a Seeed Tracker T1000-E (MeshCore).
+</p>
+
 ---
 
 <p align="center">
-  <img src="docs/dashboard.png" alt="MeshWX dashboard - live broadcaster status, recent alerts, and node health" width="900">
+  <img src="docs/dashboard.png" alt="MeshWX dashboard: live broadcaster status, recent alerts, and node health" width="900">
 </p>
+
+> [!NOTE]
+> **MeshWX is in beta and under active testing.** It has been verified on a **Heltec V3**
+> (Meshtastic) and a **Seeed Tracker T1000-E** (MeshCore). Other Meshtastic and MeshCore
+> compatible boards should work but are not tested yet, so expect rough edges. Please report
+> what does and does not work via [Issues](../../issues).
 
 > [!WARNING]
 > **MeshWX is a supplemental tool, not a certified warning system.** It depends on your
 > internet connection to reach the NWS API, on your hardware, and on LoRa propagation.
 > Do **not** rely on it as your only source of life-safety alerts. Always keep an
-> official channel - a NOAA Weather Radio, wireless emergency alerts, or local sirens.
+> official channel: a NOAA Weather Radio, wireless emergency alerts, or local sirens.
 > Test it in **dry-run mode** before you trust it, and review the settings for your area.
 
 ## Why it exists
 
-When a hurricane or flood takes out the towers, a LoRa mesh often keeps working - but the
+When a hurricane or flood takes out the towers, a LoRa mesh often keeps working, but the
 mesh has no way to *know* a warning was issued. MeshWX bridges that gap: it polls the
 [NWS alerts API](https://www.weather.gov/documentation/services-web-api), decides what's
 worth sending, formats it to fit a LoRa packet, and transmits it to everyone on your
@@ -34,10 +44,10 @@ channel. Built after living through Hurricane Helene's comms blackout.
 
 ## Features
 
-- **Dual radio, side by side.** Run Meshtastic, MeshCore, or **both at once** - every
+- **Dual radio, side by side.** Run Meshtastic, MeshCore, or **both at once**: every
   alert goes to each enabled radio on its own channel.
 - **Dead-simple setup.** Pick your state and check your counties; the NWS zones populate
-  automatically. Choose which alerts to send from checklists - no cryptic codes to type.
+  automatically. Choose which alerts to send from checklists, not cryptic codes to type.
 - **Smart filtering.** Broadcast all Warnings plus Tornado Watch by default; add other
   Watches/Advisories à la carte.
 - **No spam.** Never rebroadcasts the same alert; sends one concise *update* when a warning
@@ -96,21 +106,24 @@ No Python install required. Windows may warn about an unrecognized app the first
 ## First run
 
 1. Open the dashboard, go to **Settings**.
-2. **General → NWS contact** - set this to your email address. The NWS API
+2. **General → NWS contact**: set this to your email address. The NWS API
    [requires a contact string](https://www.weather.gov/documentation/services-web-api)
    in every request; leaving the default placeholder can get you rate-limited or blocked.
-3. **Coverage** - pick your state, check your counties.
-4. **What to broadcast** - leave *All Warnings* on; add any watches/advisories you want.
-5. **Radios** - enable Meshtastic and/or MeshCore and set each one's USB serial port and channel.
+3. **Coverage**: pick your state, check your counties.
+4. **What to broadcast**: leave *All Warnings* on; add any watches/advisories you want.
+5. **Radios**: enable Meshtastic and/or MeshCore and set each one's USB serial port and channel.
 6. Save, then go to **Troubleshoot → Send test** to confirm each radio actually transmits.
 7. When you're confident, turn **dry-run off** on the dashboard to go live.
 
 ### Radio notes
 
-- **Meshtastic** - any Meshtastic device on USB serial. The board can renumber its serial
+- **Meshtastic**: any Meshtastic device on USB serial. The board can renumber its serial
   port on replug; leave the port blank to auto-discover, or set it.
-- **MeshCore** - flash the board with the **USB (companion)** firmware, *not* repeater
+- **MeshCore**: flash the board with the **USB (companion)** firmware, *not* repeater
   firmware. Repeater firmware exposes no serial API, so MeshWX can't drive it.
+- **Tested hardware.** So far MeshWX is verified on a Heltec V3 (Meshtastic) and a Seeed
+  Tracker T1000-E (MeshCore). Other compatible boards should work; if you run one, please
+  open an [issue](../../issues) and let me know how it went.
 
 ## Configuration
 
@@ -142,6 +155,6 @@ captured NWS alert JSON fixtures under `tests/fixtures/`, with no serial/network
 
 ## License
 
-[MIT](LICENSE) - free to use, modify, and share. Contributions welcome.
+[MIT](LICENSE). Free to use, modify, and share. Contributions welcome.
 
 <p align="center"><sub>Developed by <a href="https://BrokenSignal.tv/MeshWX">BrokenSignal</a></sub></p>
