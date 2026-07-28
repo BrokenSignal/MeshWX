@@ -35,7 +35,7 @@ channel. Built after living through Hurricane Helene's comms blackout.
 ## Features
 
 - **Dual radio, side by side.** Run Meshtastic, MeshCore, or **both at once** - every
-  alert goes to each enabled radio on its own channel. USB or network (WiFi/TCP) per radio.
+  alert goes to each enabled radio on its own channel.
 - **Dead-simple setup.** Pick your state and check your counties; the NWS zones populate
   automatically. Choose which alerts to send from checklists - no cryptic codes to type.
 - **Smart filtering.** Broadcast all Warnings by default; add Watches/Advisories à la carte.
@@ -100,14 +100,14 @@ No Python install required. Windows may warn about an unrecognized app the first
    in every request; leaving the default placeholder can get you rate-limited or blocked.
 3. **Coverage** - pick your state, check your counties.
 4. **What to broadcast** - leave *All Warnings* on; add any watches/advisories you want.
-5. **Radios** - enable Meshtastic and/or MeshCore, choose USB or Network, set the port/channel.
+5. **Radios** - enable Meshtastic and/or MeshCore and set each one's USB serial port and channel.
 6. Save, then go to **Troubleshoot → Send test** to confirm each radio actually transmits.
 7. When you're confident, turn **dry-run off** on the dashboard to go live.
 
 ### Radio notes
 
-- **Meshtastic** - any Meshtastic device on USB serial or over the network (TCP). The board
-  can renumber its serial port on replug; leave the port blank to auto-discover, or set it.
+- **Meshtastic** - any Meshtastic device on USB serial. The board can renumber its serial
+  port on replug; leave the port blank to auto-discover, or set it.
 - **MeshCore** - flash the board with the **USB (companion)** firmware, *not* repeater
   firmware. Repeater firmware exposes no serial API, so MeshWX can't drive it.
 
