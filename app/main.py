@@ -52,13 +52,18 @@ async def lifespan(app: FastAPI):
     app.state.poller = poller
 
     tx.start()
-    await _startup_serial(db, tx)
+    # Connect the radios in the background so serial probing never blocks the
+    # web server from coming up (a non-node USB port can take 30s+ to time out).
+    startup_task = asyncio.create_task(_startup_serial(db, tx))
+    app.state.startup_task = startup_task
     poller.start()
 
     try:
         yield
     finally:
         logger.info("shutting down mesh-wx")
+        if not startup_task.done():
+            startup_task.cancel()
         await poller.stop()
         await tx.stop()
         db.close()

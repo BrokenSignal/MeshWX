@@ -7,6 +7,7 @@ image and `python -m app.main` path do NOT use this.
 from __future__ import annotations
 
 import os
+import socket
 import threading
 import time
 import webbrowser
@@ -16,8 +17,16 @@ os.environ.setdefault("MESH_WX_HOST", "127.0.0.1")
 os.environ.setdefault("MESH_WX_PORT", "8000")
 
 
-def _open_browser(url: str) -> None:
-    time.sleep(1.5)  # give uvicorn a moment to bind
+def _open_browser(host: str, port: int, url: str) -> None:
+    # Wait until the server is actually accepting connections before opening
+    # the browser, so the first page load never hits "refused to connect".
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                break
+        except OSError:
+            time.sleep(0.4)
     try:
         webbrowser.open(url)
     except Exception:
@@ -31,10 +40,12 @@ def main() -> None:
     browse_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     url = f"http://{browse_host}:{port}"
     print("=" * 60)
-    print(f"  MeshWX is starting - open {url}")
+    print(f"  MeshWX is starting - your browser will open at {url}")
+    print("  (first launch can take a few seconds)")
     print("  Keep this window open. Close it to stop MeshWX.")
     print("=" * 60)
-    threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
+    threading.Thread(target=_open_browser, args=(browse_host, int(port), url),
+                     daemon=True).start()
 
     from app.main import main as run_server
     run_server()
