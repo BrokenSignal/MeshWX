@@ -1,0 +1,17 @@
+{
+  "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.ffw401",
+  "type": "Feature",
+  "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.ffw401",
+    "areaDesc": "Richland; Lexington; Newberry",
+    "event": "Flash Flood Warning",
+    "messageType": "Update",
+    "effective": "2024-05-20T20:30:00-04:00",
+    "expires": "2024-05-20T23:30:00-04:00",
+    "ends": "2024-05-20T23:30:00-04:00",
+    "headline": "Flash Flood Warning issued May 20 at 8:30PM EDT until May 20 at 11:30PM EDT",
+    "references": [
+      { "@id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.ffw400", "identifier": "urn:oid:2.49.0.1.840.0.ffw400" }
+    ]
+  }
+}

@@ -1,0 +1,395 @@
+"""Web UI routes (server-rendered templates + htmx partials)."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+import datetime
+
+from fastapi import APIRouter, Form, Request
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+import httpx
+
+from ..config import MAX_PAYLOAD_BYTES, POLL_INTERVAL_MIN
+from ..serial_discovery import list_all_ports
+
+
+def _template_dir() -> Path:
+    """Locate the templates both in a normal run and inside a PyInstaller bundle."""
+    if getattr(sys, "frozen", False):  # packaged (Windows .exe / onedir)
+        base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+        return base / "app" / "web" / "templates"
+    return Path(__file__).parent / "templates"
+
+
+router = APIRouter()
+TEMPLATES = Jinja2Templates(directory=str(_template_dir()))
+
+from ..formatter import fmt_local
+TEMPLATES.env.filters["localtime"] = fmt_local
+
+
+def render(request: Request, name: str, **ctx):
+    try:
+        tz = request.app.state.db.get_setting("display_timezone", "America/New_York")
+    except Exception:
+        tz = "America/New_York"
+    return TEMPLATES.TemplateResponse(
+        request, name, {"max_bytes": MAX_PAYLOAD_BYTES, "tz": tz, **ctx}
+    )
+
+
+def _db(request: Request):
+    return request.app.state.db
+
+
+def _tx(request: Request):
+    return request.app.state.tx
+
+
+def _poller(request: Request):
+    return request.app.state.poller
+
+
+def _status_ctx(request: Request) -> dict:
+    db, tx, poller = _db(request), _tx(request), _poller(request)
+    return {
+        "last_poll_time": poller.status.last_poll_time,
+        "last_poll_result": poller.status.last_poll_result,
+        "port": tx.port or "(none)",
+        "connected": tx.connected,
+        "tx_error": tx.last_error,
+        "dry_run": bool(db.get_setting("dry_run", True)),
+        "queue_depth": tx.queue_depth,
+        "uptime": poller.status.uptime_seconds,
+        "events": db.recent_events(10),
+    }
+
+
+
+def _spark(counts):
+    if not counts or max(counts) == 0:
+        return "", ""
+    n, mx, W, H, pad = len(counts), max(counts), 720, 80, 8
+    pts = []
+    for i, c in enumerate(counts):
+        x = 0 if n == 1 else i * (W / (n - 1))
+        y = H - pad - (c / mx) * (H - 2 * pad)
+        pts.append((x, y))
+    line = "M" + " L".join("%.0f,%.0f" % (x, y) for x, y in pts)
+    return line, line + " L%d,%d L0,%d Z" % (W, H, H)
+
+
+def _dash_ctx(request) -> dict:
+    db, tx, poller = _db(request), _tx(request), _poller(request)
+    tz = db.get_setting("display_timezone", "America/New_York")
+    zones = [z.strip() for z in (db.get_setting("zones", "") or "").split(",") if z.strip()]
+    forecast = [z for z in zones if len(z) > 2 and z[2] == "Z"]
+    county = [z for z in zones if len(z) > 2 and z[2] == "C"]
+    port = tx.port or ""
+    device = "Heltec V3" if ("CP210" in port or "Silicon_Labs" in port) else (port.split("/")[-1] if port else "(none)")
+    up = poller.status.uptime_seconds
+    dd, rem = divmod(up, 86400); hh, rem = divmod(rem, 3600); mm = rem // 60
+    uptime_str = ("%dd %dh" % (dd, hh)) if dd else ("%dh %dm" % (hh, mm))
+    now = datetime.datetime.now(datetime.timezone.utc)
+    def _age(ts):
+        try:
+            return (now - datetime.datetime.fromisoformat(ts)).total_seconds() / 86400.0
+        except Exception:
+            return 999
+    rows = db.query_history(limit=1000)
+    sent = [r for r in rows if r["disposition"] in ("sent", "update", "cancelled")]
+    sent_7d = sum(1 for r in sent if _age(r["ts"]) < 7)
+    sent_today = sum(1 for r in sent if _age(r["ts"]) < 1)
+    buckets = [0] * 7
+    for r in sent:
+        a = _age(r["ts"])
+        if 0 <= a < 7:
+            buckets[6 - int(a)] += 1
+    spark_line, spark_fill = _spark(buckets)
+    include = list(db.get_setting("filter_include_exact", []) or [])
+    if db.get_setting("filter_include_suffix", []):
+        include = ["All Warnings"] + include
+    recent = [{
+        "event": r["event"], "area": r["area"], "disposition": r["disposition"],
+        "detail": r["detail"], "text": r["transmitted_text"], "when": fmt_local(r["ts"], tz),
+    } for r in db.query_history(limit=6)]
+    ltx = db.query_transmit_log(limit=1)
+    last_tx = "-"
+    if ltx:
+        last_tx = ("OK &middot; " if ltx[0]["success"] else "failed &middot; ") + fmt_local(ltx[0]["ts"], tz)
+    return {
+        "dry_run": bool(db.get_setting("dry_run", True)),
+        "connected": tx.connected, "device": device, "tx_error": tx.last_error,
+        "channel_index": int(db.get_setting("channel_index", 0)),
+        "zone_count": len(zones), "forecast_count": len(forecast), "county_count": len(county),
+        "poll_interval": int(db.get_setting("poll_interval", 120)), "queue_depth": tx.queue_depth,
+        "last_poll_local": fmt_local(poller.status.last_poll_time, tz) if poller.status.last_poll_time else "-",
+        "uptime_str": uptime_str, "sent_7d": sent_7d, "sent_today": sent_today,
+        "spark_line": spark_line, "spark_fill": spark_fill,
+        "include": include, "recent": recent, "last_tx": last_tx,
+        "transports": tx.status(),
+    }
+
+
+# ---- dashboard ---------------------------------------------------------
+@router.get("/", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    return render(request, "dashboard.html", **_dash_ctx(request))
+
+
+@router.get("/partials/status", response_class=HTMLResponse)
+async def status_partial(request: Request):
+    return render(request, "_dash_top.html", **_dash_ctx(request))
+
+
+@router.post("/dry-run/toggle", response_class=HTMLResponse)
+async def toggle_dry_run(request: Request):
+    db = _db(request)
+    db.set_setting("dry_run", not bool(db.get_setting("dry_run", True)))
+    db.add_event("INFO", f"dry-run set to {db.get_setting('dry_run')}")
+    return render(request, "_dash_top.html", **_dash_ctx(request))
+
+
+# ---- history -----------------------------------------------------------
+@router.get("/history", response_class=HTMLResponse)
+async def history(request: Request, disposition: str = "", date_from: str = "",
+                  date_to: str = ""):
+    rows = _db(request).query_history(
+        disposition=disposition or None,
+        date_from=date_from or None,
+        date_to=date_to or None,
+    )
+    return render(
+        request, "history.html", rows=rows, disposition=disposition,
+        date_from=date_from, date_to=date_to,
+        dispositions=["sent", "filtered", "duplicate", "update", "cancelled"],
+    )
+
+
+# ---- transmit log ------------------------------------------------------
+@router.get("/transmit-log", response_class=HTMLResponse)
+async def transmit_log(request: Request):
+    rows = _db(request).query_transmit_log()
+    return render(request, "transmit_log.html", rows=rows)
+
+
+
+_STATES = [
+    ("AL","Alabama"),("AK","Alaska"),("AZ","Arizona"),("AR","Arkansas"),("CA","California"),
+    ("CO","Colorado"),("CT","Connecticut"),("DE","Delaware"),("DC","District of Columbia"),
+    ("FL","Florida"),("GA","Georgia"),("HI","Hawaii"),("ID","Idaho"),("IL","Illinois"),
+    ("IN","Indiana"),("IA","Iowa"),("KS","Kansas"),("KY","Kentucky"),("LA","Louisiana"),
+    ("ME","Maine"),("MD","Maryland"),("MA","Massachusetts"),("MI","Michigan"),("MN","Minnesota"),
+    ("MS","Mississippi"),("MO","Missouri"),("MT","Montana"),("NE","Nebraska"),("NV","Nevada"),
+    ("NH","New Hampshire"),("NJ","New Jersey"),("NM","New Mexico"),("NY","New York"),
+    ("NC","North Carolina"),("ND","North Dakota"),("OH","Ohio"),("OK","Oklahoma"),("OR","Oregon"),
+    ("PA","Pennsylvania"),("RI","Rhode Island"),("SC","South Carolina"),("SD","South Dakota"),
+    ("TN","Tennessee"),("TX","Texas"),("UT","Utah"),("VT","Vermont"),("VA","Virginia"),
+    ("WA","Washington"),("WV","West Virginia"),("WI","Wisconsin"),("WY","Wyoming"),
+    ("PR","Puerto Rico"),("VI","U.S. Virgin Islands"),("GU","Guam"),
+]
+
+_EVENT_GROUPS = {
+    "Warnings": ["Tornado Warning","Severe Thunderstorm Warning","Flash Flood Warning",
+        "Flood Warning","Hurricane Warning","Tropical Storm Warning","Storm Surge Warning",
+        "Winter Storm Warning","Ice Storm Warning","Blizzard Warning","High Wind Warning",
+        "Extreme Heat Warning","Excessive Heat Warning","Red Flag Warning","Dust Storm Warning",
+        "Freeze Warning"],
+    "Watches": ["Tornado Watch","Severe Thunderstorm Watch","Flash Flood Watch","Flood Watch",
+        "Hurricane Watch","Tropical Storm Watch","Winter Storm Watch","High Wind Watch",
+        "Fire Weather Watch"],
+    "Advisories": ["Special Weather Statement","Severe Weather Statement","Heat Advisory",
+        "Wind Advisory","Winter Weather Advisory","Flood Advisory","Dense Fog Advisory",
+        "Frost Advisory","Air Quality Alert","Coastal Flood Advisory","Rip Current Statement"],
+}
+
+
+async def _fetch_counties(state: str, contact: str):
+    ua = "mesh-wx/1.0 (%s)" % contact if contact else "mesh-wx/1.0"
+    url = "https://api.weather.gov/zones?area=%s&type=county" % state
+    async with httpx.AsyncClient(timeout=20,
+            headers={"User-Agent": ua, "Accept": "application/geo+json"}) as c:
+        r = await c.get(url); r.raise_for_status()
+        feats = r.json().get("features", [])
+    out = [(f["properties"]["id"], f["properties"]["name"]) for f in feats]
+    return sorted(out, key=lambda x: x[1])
+
+
+@router.get("/settings/counties", response_class=HTMLResponse)
+async def settings_counties(request: Request, state: str = ""):
+    db = _db(request)
+    selected = set(z.strip() for z in (db.get_setting("zones", "") or "").split(",") if z.strip())
+    counties, err = [], ""
+    if state:
+        try:
+            counties = await _fetch_counties(state, db.get_setting("nws_contact", ""))
+        except Exception as exc:
+            err = "Could not load counties for %s (%s). Check your internet/NWS contact and retry." % (state, exc)
+    return render(request, "_counties.html", counties=counties, selected=selected, state=state, err=err)
+
+
+# ---- settings ----------------------------------------------------------
+@router.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    db = _db(request)
+    s = db.all_settings()
+    zones = [z.strip() for z in (s.get("zones", "") or "").split(",") if z.strip()]
+    counties_sel = [z for z in zones if len(z) > 2 and z[2] == "C"]
+    extra = [z for z in zones if not (len(z) > 2 and z[2] == "C")]
+    current_state = counties_sel[0][:2] if counties_sel else ""
+    county_list = []
+    if current_state:
+        try:
+            county_list = await _fetch_counties(current_state, s.get("nws_contact", ""))
+        except Exception:
+            county_list = []
+    return render(
+        request, "settings.html", s=s, min_interval=POLL_INTERVAL_MIN, ports=None,
+        states=_STATES, current_state=current_state, state=current_state,
+        counties=county_list, selected=set(counties_sel), extra_zones=", ".join(extra),
+        event_groups=_EVENT_GROUPS,
+        selected_events=set(s.get("filter_include_exact", []) or []),
+        all_warnings=bool(s.get("filter_include_suffix", []) or []), err="",
+        mt_enabled=bool(s.get("meshtastic_enabled", True)),
+        mt_conn=s.get("meshtastic_conn", "serial") or "serial",
+        mt_host=s.get("meshtastic_host", "") or "",
+        mt_channel=int(s.get("channel_index", 0) or 0),
+        mt_port=s.get("serial_port", "") or "",
+        mc_enabled=bool(s.get("meshcore_enabled", False)),
+        mc_conn=s.get("meshcore_conn", "serial") or "serial",
+        mc_port=s.get("meshcore_port", "") or "",
+        mc_host=s.get("meshcore_host", "") or "",
+        mc_channel=int(s.get("meshcore_channel", 0) or 0),
+    )
+
+
+@router.post("/settings", response_class=HTMLResponse)
+async def save_settings(
+    request: Request,
+    poll_interval: int = Form(...),
+    nws_contact: str = Form(...),
+    channel_index: int = Form(0),
+    display_timezone: str = Form(...),
+    serial_port: str = Form(""),
+    state: str = Form(""),
+    counties: list[str] = Form(default=[]),
+    extra_zones: str = Form(""),
+    events: list[str] = Form(default=[]),
+    all_warnings: str = Form(""),
+    meshtastic_enabled: str = Form(""),
+    meshtastic_conn: str = Form("serial"),
+    meshtastic_host: str = Form(""),
+    meshcore_enabled: str = Form(""),
+    meshcore_conn: str = Form("serial"),
+    meshcore_port: str = Form(""),
+    meshcore_host: str = Form(""),
+    meshcore_channel: int = Form(0),
+):
+    db, tx, poller = _db(request), _tx(request), _poller(request)
+    interval = max(POLL_INTERVAL_MIN, int(poll_interval))
+
+    zone_list = [c.strip() for c in counties if c.strip()]
+    zone_list += [z.strip() for z in extra_zones.split(",") if z.strip()]
+    db.set_setting("zones", ",".join(zone_list))
+    db.set_setting("poll_interval", interval)
+    db.set_setting("nws_contact", nws_contact.strip())
+    db.set_setting("channel_index", int(channel_index))
+    db.set_setting("display_timezone", display_timezone.strip())
+    db.set_setting("filter_include_exact", [e for e in events if e])
+    db.set_setting("filter_include_suffix", ["Warning"] if all_warnings else [])
+    db.set_setting("filter_exclude_exact", [])
+
+    # Radios — Meshtastic + MeshCore, each independently enabled.
+    db.set_setting("meshtastic_enabled", bool(meshtastic_enabled))
+    db.set_setting("meshtastic_conn", (meshtastic_conn or "serial").strip())
+    db.set_setting("meshtastic_host", meshtastic_host.strip())
+    db.set_setting("serial_port", serial_port.strip())
+    db.set_setting("meshcore_enabled", bool(meshcore_enabled))
+    db.set_setting("meshcore_conn", (meshcore_conn or "serial").strip())
+    db.set_setting("meshcore_port", meshcore_port.strip())
+    db.set_setting("meshcore_host", meshcore_host.strip())
+    db.set_setting("meshcore_channel", int(meshcore_channel))
+
+    # Rebuild transports from the new settings and (re)connect the enabled ones.
+    await tx.reconfigure()
+
+    poller.poke()
+    db.add_event("INFO", "settings saved")
+    return RedirectResponse("/settings", status_code=303)
+
+
+@router.post("/settings/scan", response_class=HTMLResponse)
+async def scan_ports(request: Request):
+    ports = list_all_ports()
+    return render(request, "_ports.html", ports=ports)
+
+
+# ---- manual send -------------------------------------------------------
+@router.get("/manual", response_class=HTMLResponse)
+async def manual_page(request: Request):
+    return render(request, "manual_send.html")
+
+
+@router.post("/manual/send", response_class=HTMLResponse)
+async def manual_send(request: Request, text: str = Form(...)):
+    db, tx = _db(request), _tx(request)
+    text = text[:MAX_PAYLOAD_BYTES] if len(text.encode()) > MAX_PAYLOAD_BYTES else text
+    # Enforce byte cap defensively (multibyte-safe).
+    while len(text.encode()) > MAX_PAYLOAD_BYTES:
+        text = text[:-1]
+    channel = int(db.get_setting("channel_index", 0))
+    ok = await tx.send_manual(text, channel)
+    msg = "sent" if ok else f"failed: {tx.last_error}"
+    return render(request, "_manual_result.html", ok=ok, message=msg,
+                  text=text, bytes=len(text.encode()))
+
+
+# ---- troubleshoot ------------------------------------------------------
+@router.get("/troubleshoot", response_class=HTMLResponse)
+async def troubleshoot(request: Request):
+    return render(request, "troubleshoot.html",
+                  errors=_db(request).recent_errors(),
+                  transports=_tx(request).status())
+
+
+@router.post("/troubleshoot/test", response_class=HTMLResponse)
+async def send_test(request: Request):
+    tx = _tx(request)
+    text = "[WX] mesh-wx test message"
+    ok = await tx.send_manual(text)
+    return render(
+        request, "_manual_result.html", ok=ok,
+        message=("test sent to all radios" if ok else f"failed: {tx.last_error}"),
+        text=text, bytes=len(text.encode()),
+    )
+
+
+@router.post("/troubleshoot/test/{name}", response_class=HTMLResponse)
+async def send_test_one(request: Request, name: str):
+    tx = _tx(request)
+    label = {t["name"]: t["label"] for t in tx.status()}.get(name, name)
+    text = "[WX] mesh-wx test via %s" % label
+    ok, err = await tx.send_to(name, text)
+    return render(
+        request, "_manual_result.html", ok=ok,
+        message=(f"test sent via {label}" if ok else f"{label} failed: {err}"),
+        text=text, bytes=len(text.encode()),
+    )
+
+
+@router.get("/troubleshoot/raw", response_class=PlainTextResponse)
+async def raw_response(request: Request):
+    raw = _poller(request).status.last_raw_response
+    return raw or "(no NWS response captured yet)"
+
+
+def _split_lines(value: str) -> list[str]:
+    """Parse a textarea/newline- or comma-separated list into clean items."""
+    parts: list[str] = []
+    for chunk in value.replace(",", "\n").splitlines():
+        item = chunk.strip()
+        if item:
+            parts.append(item)
+    return parts
+

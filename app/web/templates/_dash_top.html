@@ -1,0 +1,54 @@
+<div id="dashtop" hx-get="/partials/status" hx-trigger="every 10s" hx-swap="outerHTML">
+  <div class="topbar">
+    <div>
+      <h2 class="pt">Dashboard</h2>
+      <p class="sub">NWS → Meshtastic · Broader Midlands SC</p>
+    </div>
+    <div class="topbar-right">
+      <span class="live-pill{{ ' paused' if dry_run else '' }}"><span class="dot"></span>{{ "PAUSED" if dry_run else "Broadcasting LIVE" }}</span>
+      <form method="post" action="/dry-run/toggle" hx-post="/dry-run/toggle" hx-target="#dashtop" hx-swap="outerHTML">
+        <button class="secondary" type="submit">{{ "Go live" if dry_run else "Pause" }}</button>
+      </form>
+    </div>
+  </div>
+
+  <section class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="hlbl">Broadcaster status</div>
+        <h2 class="hero-h">Watching {{ zone_count }} zones · every {{ poll_interval }}s</h2>
+      </div>
+      <div class="hero-right">
+        <div class="m"><div class="k">Last poll</div><div class="v">{{ last_poll_local }}</div></div>
+        <div class="m"><div class="k">Queue</div><div class="v">{{ queue_depth }}</div></div>
+      </div>
+    </div>
+    <div class="hero-metrics">
+      <div class="m"><div class="k">Uptime</div><div class="v">{{ uptime_str }}</div></div>
+      <div class="m"><div class="k">Sent · 7d</div><div class="v">{{ sent_7d }}</div></div>
+      <div class="m"><div class="k">Sent today</div><div class="v">{{ sent_today }}</div></div>
+    </div>
+    {% if spark_line %}
+    <svg class="spark" viewBox="0 0 720 80" preserveAspectRatio="none">
+      <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#8ea2ff" stop-opacity=".5"/><stop offset="1" stop-color="#8ea2ff" stop-opacity="0"/>
+      </linearGradient></defs>
+      <path d="{{ spark_fill }}" fill="url(#sg)"/>
+      <path d="{{ spark_line }}" fill="none" stroke="#c9d3ff" stroke-width="2"/>
+    </svg>
+    {% endif %}
+    {% if tx_error %}<div class="hero-err">Radio: {{ tx_error }}</div>{% endif %}
+  </section>
+
+  <section class="dstats">
+    <div class="dstat"><div class="top"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a7 7 0 0114 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span class="t">Coverage</span></div>
+      <div class="big">{{ zone_count }}</div><div class="s2">{{ forecast_count }} forecast + {{ county_count }} county</div></div>
+    <div class="dstat"><div class="top"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="t">Poll interval</span></div>
+      <div class="big">{{ poll_interval }}<span class="unit">s</span></div><div class="s2">every cycle, automatic</div></div>
+    <div class="dstat"><div class="top"><svg viewBox="0 0 24 24"><path d="M4 8a12 12 0 0116 0"/><path d="M7 12a7 7 0 0110 0"/><circle cx="12" cy="16" r="1.6" fill="currentColor" stroke="none"/></svg><span class="t">Broadcast · 7d</span></div>
+      <div class="big">{{ sent_7d }}</div><div class="s2">{{ sent_today }} today</div></div>
+    <div class="dstat"><div class="top"><svg viewBox="0 0 24 24"><path d="M4 8a12 12 0 0116 0"/><path d="M7 12a7 7 0 0110 0"/></svg><span class="t">Node</span></div>
+      <div class="big" style="font-size:18px;color:{{ 'var(--good)' if connected else 'var(--bad)' }};">{{ "Connected" if connected else "Offline" }}</div>
+      <div class="s2">{{ device }} · ch {{ channel_index }}</div></div>
+  </section>
+</div>

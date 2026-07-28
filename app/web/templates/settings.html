@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %} · Settings{% endblock %}
+{% block content %}
+<h2>Settings</h2>
+<form method="post" action="/settings">
+
+  <div class="panel">
+    <h3>Coverage area</h3>
+    <p class="hint">Pick your state, then check the counties to monitor. Counties cover
+      <em>every</em> alert type — tornado, severe thunderstorm and flood warnings, plus
+      watches and advisories — so this is all most people need.</p>
+    <label>State</label>
+    <select name="state" hx-get="/settings/counties" hx-target="#counties"
+            hx-swap="innerHTML" hx-include="this">
+      <option value="">— select a state —</option>
+      {% for ab, nm in states %}
+      <option value="{{ ab }}" {% if ab == current_state %}selected{% endif %}>{{ nm }}</option>
+      {% endfor %}
+    </select>
+    <span class="fld-lbl">Counties</span>
+    <div id="counties">{% include "_counties.html" %}</div>
+    <details class="adv">
+      <summary>Advanced: extra zone codes</summary>
+      <p class="hint">Optional. Additional NWS zone codes, comma-separated — e.g. marine zones
+        (AMZ350) or forecast zones outside the counties above.</p>
+      <input name="extra_zones" value="{{ extra_zones }}" placeholder="e.g. AMZ350, GMZ850">
+    </details>
+  </div>
+
+  <div class="panel">
+    <h3>What to broadcast</h3>
+    <label class="chk" style="margin-bottom:6px;">
+      <input type="checkbox" name="all_warnings" {% if all_warnings %}checked{% endif %}>
+      <span><b>All Warning products</b> — tornado, severe thunderstorm, flood, winter, wind, heat… <em>(recommended)</em></span>
+    </label>
+    <p class="hint">Warnings are the life-safety alerts. Leave this on and just add any watches or
+      advisories you also want below.</p>
+    <div class="grp-title">Watches</div>
+    <div class="checkgrid">
+      {% for ev in event_groups.Watches %}
+      <label class="chk"><input type="checkbox" name="events" value="{{ ev }}" {% if ev in selected_events %}checked{% endif %}> {{ ev }}</label>
+      {% endfor %}
+    </div>
+    <div class="grp-title">Advisories &amp; statements</div>
+    <div class="checkgrid">
+      {% for ev in event_groups.Advisories %}
+      <label class="chk"><input type="checkbox" name="events" value="{{ ev }}" {% if ev in selected_events %}checked{% endif %}> {{ ev }}</label>
+      {% endfor %}
+    </div>
+    <details class="adv">
+      <summary>Pick individual warnings instead of “All Warning products”</summary>
+      <div class="checkgrid" style="margin-top:8px;">
+        {% for ev in event_groups.Warnings %}
+        <label class="chk"><input type="checkbox" name="events" value="{{ ev }}" {% if ev in selected_events %}checked{% endif %}> {{ ev }}</label>
+        {% endfor %}
+      </div>
+    </details>
+  </div>
+
+  <div class="panel">
+    <h3>Radios</h3>
+    <p class="hint">Run <b>Meshtastic</b> and/or <b>MeshCore</b> side by side. Enable either or both —
+      every alert is broadcast to each enabled radio on its own channel.</p>
+
+    <div class="radio-card">
+      <label class="chk"><input type="checkbox" name="meshtastic_enabled" {% if mt_enabled %}checked{% endif %}> <b>Meshtastic</b></label>
+      <div class="row" style="margin-top:12px;">
+        <div><label>Connection</label>
+          <select name="meshtastic_conn">
+            <option value="serial" {% if mt_conn=='serial' %}selected{% endif %}>USB (serial)</option>
+            <option value="tcp" {% if mt_conn=='tcp' %}selected{% endif %}>Network (WiFi / TCP)</option>
+          </select></div>
+        <div><label>Channel index (0 = LongFast)</label>
+          <input name="channel_index" type="number" min="0" value="{{ mt_channel }}"></div>
+      </div>
+      <label>USB serial port</label>
+      <input id="serial_port" name="serial_port" value="{{ mt_port }}"
+             placeholder="/dev/serial/by-id/… · /dev/ttyUSB0 · /dev/ttyACM0">
+      <button type="button" class="secondary" hx-post="/settings/scan"
+              hx-target="#ports" hx-swap="outerHTML" style="margin-top:8px;">Scan for USB nodes</button>
+      <div style="margin-top:8px;">{% include "_ports.html" %}</div>
+      <label>Network address (host or host:port) — for the Network option</label>
+      <input name="meshtastic_host" value="{{ mt_host }}" placeholder="192.168.1.50">
+    </div>
+
+    <div class="radio-card">
+      <label class="chk"><input type="checkbox" name="meshcore_enabled" {% if mc_enabled %}checked{% endif %}> <b>MeshCore</b></label>
+      <div class="row" style="margin-top:12px;">
+        <div><label>Connection</label>
+          <select name="meshcore_conn">
+            <option value="serial" {% if mc_conn=='serial' %}selected{% endif %}>USB (serial)</option>
+            <option value="tcp" {% if mc_conn=='tcp' %}selected{% endif %}>Network (TCP)</option>
+          </select></div>
+        <div><label>Channel index</label>
+          <input name="meshcore_channel" type="number" min="0" value="{{ mc_channel }}"></div>
+      </div>
+      <label>USB serial port</label>
+      <input name="meshcore_port" value="{{ mc_port }}"
+             placeholder="/dev/ttyACM0 · /dev/ttyUSB0">
+      <label>Network address host:port — for the Network option</label>
+      <input name="meshcore_host" value="{{ mc_host }}" placeholder="192.168.1.51:4000">
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>General</h3>
+    <div class="row">
+      <div><label>Poll interval (seconds, min {{ min_interval }})</label>
+        <input name="poll_interval" type="number" min="{{ min_interval }}"
+               value="{{ s.poll_interval }}" required></div>
+      <div><label>NWS contact (email, sent in the request header)</label>
+        <input name="nws_contact" value="{{ s.nws_contact }}" required></div>
+      <div><label>Display timezone (IANA)</label>
+        <input name="display_timezone" value="{{ s.display_timezone }}" required></div>
+    </div>
+  </div>
+
+  <button type="submit">Save settings</button>
+</form>
+{% endblock %}

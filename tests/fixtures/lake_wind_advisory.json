@@ -1,0 +1,14 @@
+{
+  "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.lwa300",
+  "type": "Feature",
+  "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.lwa300",
+    "areaDesc": "Lake Murray",
+    "event": "Lake Wind Advisory",
+    "messageType": "Alert",
+    "effective": "2024-05-20T10:00:00-04:00",
+    "expires": "2024-05-20T20:00:00-04:00",
+    "headline": "Lake Wind Advisory issued May 20 at 10:00AM EDT until May 20 at 8:00PM EDT",
+    "references": []
+  }
+}

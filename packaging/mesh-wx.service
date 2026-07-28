@@ -1,0 +1,22 @@
+[Unit]
+Description=MeshWX — NWS weather alerts over Meshtastic / MeshCore
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Populated by install-linux.sh:
+#   __USER__    the service account (added to the dialout group for serial)
+#   __DIR__     install directory (holds the virtualenv + source)
+User=__USER__
+Group=dialout
+WorkingDirectory=__DIR__
+Environment=MESH_WX_HOST=0.0.0.0
+Environment=MESH_WX_PORT=8110
+Environment=MESH_WX_DB=__DIR__/data/mesh-wx.db
+ExecStart=__DIR__/.venv/bin/python -m app.main
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

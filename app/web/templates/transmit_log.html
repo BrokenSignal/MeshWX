@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %} · Transmit Log{% endblock %}
+{% block content %}
+<h2>Transmit Log</h2>
+<div class="panel" style="padding:0;">
+  {% for r in rows %}
+  <div class="rec">
+    <div class="rec-head">
+      <span class="rec-time">{{ r["ts"] | localtime(tz) }}</span>
+      <span style="display:flex;gap:8px;">
+        {% if r["success"] %}<span class="pill ok">ok</span>{% else %}<span class="pill bad">fail</span>{% endif %}
+        <span class="pill muted">{{ "manual" if r["manual"] else "auto" }}</span>
+      </span>
+    </div>
+    <div class="rec-msgrow">
+      <div class="rec-msgwrap">
+        <div class="rec-lbl">TX Message</div>
+        <div class="rec-msg">{{ r["text"] }}</div>
+      </div>
+      <div class="rec-detail">ch {{ r["channel"] }} · {{ r["byte_count"] }} bytes</div>
+    </div>
+    {% if r["error"] %}
+    <div class="rec-areawrap">
+      <div class="rec-lbl">Error</div>
+      <div class="rec-area" style="color:var(--bad);">{{ r["error"] }}</div>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="rec"><span class="hint">No transmissions yet.</span></div>
+  {% endfor %}
+</div>
+{% endblock %}

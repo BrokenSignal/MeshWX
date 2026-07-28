@@ -1,0 +1,14 @@
+{% if err %}
+<p class="hint" style="color:var(--bad);">{{ err }}</p>
+{% elif counties %}
+<div class="checkgrid scroll">
+  {% for id, name in counties %}
+  <label class="chk"><input type="checkbox" name="counties" value="{{ id }}" {% if id in selected %}checked{% endif %}> {{ name }}</label>
+  {% endfor %}
+</div>
+<p class="hint">{{ counties|length }} counties in {{ state }} — check the ones to cover.</p>
+{% elif state %}
+<p class="hint">No counties found for “{{ state }}”.</p>
+{% else %}
+<p class="hint">Pick a state above to list its counties.</p>
+{% endif %}

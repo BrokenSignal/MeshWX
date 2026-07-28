@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %} · History{% endblock %}
+{% block content %}
+<h2>Alert History</h2>
+<div class="panel">
+  <form method="get" action="/history" class="row">
+    <div>
+      <label>Status</label>
+      <select name="disposition">
+        <option value="">all</option>
+        {% for d in dispositions %}
+        <option value="{{ d }}" {% if d == disposition %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div><label>From (ISO)</label>
+      <input name="date_from" value="{{ date_from }}" placeholder="2026-07-23"></div>
+    <div><label>To (ISO)</label>
+      <input name="date_to" value="{{ date_to }}" placeholder="2026-07-24"></div>
+    <div style="display:flex;align-items:flex-end;">
+      <button type="submit">Filter</button></div>
+  </form>
+</div>
+<div class="panel" style="padding:0;">
+  {% for r in rows %}
+  <div class="rec">
+    <div class="rec-head">
+      <span class="rec-time">{{ r["ts"] | localtime(tz) }}</span>
+      <span class="pill {{ r['disposition'] }}">{{ r["disposition"] }}</span>
+    </div>
+    <div class="rec-event">{{ r["event"] }}</div>
+    <div class="rec-msgrow">
+      <div class="rec-msgwrap">
+        <div class="rec-lbl">TX Message</div>
+        {% if r["transmitted_text"] %}
+        <div class="rec-msg">{{ r["transmitted_text"] }}</div>
+        {% else %}
+        <div class="rec-msg none">not transmitted</div>
+        {% endif %}
+      </div>
+      {% if r["detail"] %}<div class="rec-detail">{{ r["detail"] }}</div>{% endif %}
+    </div>
+    {% if r["area"] %}
+    <div class="rec-areawrap">
+      <div class="rec-lbl">Area</div>
+      <div class="rec-area">{{ r["area"] }}</div>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="rec"><span class="hint">No history yet.</span></div>
+  {% endfor %}
+</div>
+{% endblock %}

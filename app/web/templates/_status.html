@@ -1,0 +1,45 @@
+<div id="status">
+  <div class="grid">
+    <div class="stat"><div class="k">Last poll</div>
+      <div class="v">{{ last_poll_time or "—" }}</div></div>
+    <div class="stat"><div class="k">Poll result</div>
+      <div class="v">{{ last_poll_result }}</div></div>
+    <div class="stat"><div class="k">Serial port</div>
+      <div class="v mono">{{ port }}</div></div>
+    <div class="stat"><div class="k">Connection</div>
+      <div class="v">
+        {% if connected %}<span class="pill ok">connected</span>
+        {% else %}<span class="pill bad">disconnected</span>{% endif %}
+        {% if tx_error %}<div class="hint">{{ tx_error }}</div>{% endif %}
+      </div></div>
+    <div class="stat"><div class="k">Queue depth</div>
+      <div class="v">{{ queue_depth }}</div></div>
+    <div class="stat"><div class="k">Uptime</div>
+      <div class="v">{{ (uptime // 3600) }}h {{ (uptime % 3600) // 60 }}m</div></div>
+    <div class="stat"><div class="k">Broadcasting</div>
+      <div class="v">
+        {% if dry_run %}<span class="pill warn">PAUSED</span>
+        {% else %}<span class="pill ok">LIVE</span>{% endif %}
+        <form method="post" action="/dry-run/toggle" hx-post="/dry-run/toggle"
+              hx-target="#status" hx-swap="outerHTML" style="margin-top:8px;">
+          <button class="secondary" type="submit">
+            {{ "Go live" if dry_run else "Pause broadcasting" }}</button>
+        </form>
+      </div></div>
+  </div>
+
+  <div class="panel" style="margin-top:18px;">
+  <h3>Recent events</h3>
+  <table>
+    <thead><tr><th>Time</th><th>Level</th><th>Message</th></tr></thead>
+    <tbody>
+      {% for e in events %}
+      <tr><td class="mono">{{ e["ts"] | localtime(tz) }}</td><td>{{ e["level"] }}</td>
+          <td>{{ e["message"] }}</td></tr>
+      {% else %}
+      <tr><td colspan="3" class="hint">No events yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>

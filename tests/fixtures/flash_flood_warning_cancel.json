@@ -1,0 +1,16 @@
+{
+  "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.ffw402",
+  "type": "Feature",
+  "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.ffw402",
+    "areaDesc": "Richland; Lexington",
+    "event": "Flash Flood Warning",
+    "messageType": "Cancel",
+    "effective": "2024-05-20T21:00:00-04:00",
+    "expires": "2024-05-20T22:00:00-04:00",
+    "headline": "Flash Flood Warning cancelled May 20 at 9:00PM EDT",
+    "references": [
+      { "@id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.ffw400", "identifier": "urn:oid:2.49.0.1.840.0.ffw400" }
+    ]
+  }
+}

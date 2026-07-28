@@ -1,0 +1,26 @@
+# runtime state
+data/
+*.db
+*.db-journal
+*.db-wal
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+
+# packaging / builds
+build/
+dist/
+*.spec.bak
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.bak
+*.bak-*

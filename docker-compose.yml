@@ -1,0 +1,27 @@
+services:
+  mesh-wx:
+    build: .
+    container_name: mesh-wx
+    restart: unless-stopped
+    # Host 8110 (8000 is taken on VM103; sits next to paperless :8100).
+    # Container still listens on 8000 (MESH_WX_PORT below).
+    ports:
+      - "8110:8000"
+    environment:
+      MESH_WX_PORT: "8000"
+      MESH_WX_DB: "/data/mesh-wx.db"
+    volumes:
+      # SQLite lives here (settings, history, transmit log, dedupe state).
+      - ./data:/data
+      # Bind-mount the host device tree so the serial nodes AND the stable
+      # /dev/serial/by-id/ symlinks are visible inside the container even
+      # after re-plugging or ttyUSB* renumbering. Combined with the cgroup
+      # rules below, this means a port change never requires a compose edit.
+      - /dev:/dev
+    # Grant access to USB serial device *classes* rather than pinning one
+    # /dev/ttyUSBx path:
+    #   188:*  -> USB serial converters (ttyUSB*, e.g. CP210x / CH9102)
+    #   166:*  -> USB CDC ACM devices  (ttyACM*)
+    device_cgroup_rules:
+      - "c 188:* rmw"
+      - "c 166:* rmw"

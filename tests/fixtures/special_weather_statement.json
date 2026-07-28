@@ -1,0 +1,14 @@
+{
+  "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.sws500",
+  "type": "Feature",
+  "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.sws500",
+    "areaDesc": "Sumter",
+    "event": "Special Weather Statement",
+    "messageType": "Alert",
+    "effective": "2024-05-20T16:00:00-04:00",
+    "expires": "2024-05-20T17:00:00-04:00",
+    "headline": "Special Weather Statement issued May 20 at 4:00PM EDT",
+    "references": []
+  }
+}

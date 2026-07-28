@@ -1,0 +1,15 @@
+{
+  "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.tw001",
+  "type": "Feature",
+  "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.tw001",
+    "areaDesc": "Charleston; Berkeley; Dorchester",
+    "event": "Tornado Warning",
+    "messageType": "Alert",
+    "effective": "2024-05-20T20:10:00-04:00",
+    "expires": "2024-05-20T20:45:00-04:00",
+    "ends": "2024-05-20T20:45:00-04:00",
+    "headline": "Tornado Warning issued May 20 at 8:10PM EDT until May 20 at 8:45PM EDT",
+    "references": []
+  }
+}
