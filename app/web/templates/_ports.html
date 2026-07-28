@@ -1,4 +1,5 @@
-<div id="ports">
+{% set field = target | default('serial_port') %}
+<div id="ports-{{ field }}">
   {% if ports is none %}
   {% elif ports %}
   <table>
@@ -12,7 +13,7 @@
         <td>{{ p.description }}{% if p.vid %}
             <span class="hint">({{ "%04x"|format(p.vid) }}:{{ "%04x"|format(p.pid or 0) }})</span>{% endif %}</td>
         <td><button type="button" class="secondary"
-              onclick="document.getElementById('serial_port').value='{{ p.preferred_path }}'">
+              onclick="document.getElementById('{{ field }}').value='{{ p.preferred_path }}'">
               Use</button></td>
       </tr>
       {% endfor %}

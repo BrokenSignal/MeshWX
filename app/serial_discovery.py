@@ -115,10 +115,19 @@ def probe_port(device: str, timeout: float = 10.0) -> bool:
                 pass
 
 
-def discover_port() -> str | None:
-    """Scan, probe candidates, return the preferred path of the first live node."""
+def discover_port(exclude: set[str] | None = None) -> str | None:
+    """Scan, probe candidates, return the preferred path of the first live node.
+
+    Ports in ``exclude`` are skipped — used so Meshtastic auto-discovery never
+    probes (and locks) a port the user has assigned to another radio, e.g. a
+    MeshCore board. Probing a non-Meshtastic port blocks it for ~30s.
+    """
+    exclude = {e for e in (exclude or set()) if e}
     for c in candidate_ports():
         path = c.preferred_path
+        if path in exclude or c.device in exclude:
+            logger.info("skipping %s (assigned to another radio)", path)
+            continue
         logger.info("probing candidate %s (%s)", path, c.description)
         if probe_port(path):
             logger.info("confirmed Meshtastic node at %s", path)

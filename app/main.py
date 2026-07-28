@@ -25,8 +25,10 @@ async def _startup_serial(db: Database, tx: TransmitManager) -> None:
     if mt_serial and not db.get_setting("serial_port", ""):
         logger.info("no serial port saved; scanning for a node")
         from .serial_discovery import discover_port
+        # Never probe a port the user assigned to MeshCore (probing locks it).
+        exclude = {db.get_setting("meshcore_port", "") or ""}
         loop = asyncio.get_event_loop()
-        found = await loop.run_in_executor(None, discover_port)
+        found = await loop.run_in_executor(None, lambda: discover_port(exclude))
         if found:
             db.set_setting("serial_port", found)
             db.add_event("INFO", f"auto-discovered node at {found}")

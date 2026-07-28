@@ -320,9 +320,11 @@ async def save_settings(
 
 
 @router.post("/settings/scan", response_class=HTMLResponse)
-async def scan_ports(request: Request):
+async def scan_ports(request: Request, target: str = Form("serial_port")):
     ports = list_all_ports()
-    return render(request, "_ports.html", ports=ports)
+    # only allow the two known field ids to be scripted into the page
+    field = target if target in ("serial_port", "meshcore_port") else "serial_port"
+    return render(request, "_ports.html", ports=ports, target=field)
 
 
 # ---- manual send -------------------------------------------------------

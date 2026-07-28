@@ -73,12 +73,13 @@
         <div><label>Channel index (0 = LongFast)</label>
           <input name="channel_index" type="number" min="0" value="{{ mt_channel }}"></div>
       </div>
-      <label>USB serial port</label>
+      <label>USB serial port (COM3 on Windows · /dev/ttyUSB0 · /dev/ttyACM0)</label>
       <input id="serial_port" name="serial_port" value="{{ mt_port }}"
-             placeholder="/dev/serial/by-id/… · /dev/ttyUSB0 · /dev/ttyACM0">
+             placeholder="click Scan, then Use — or type it">
       <button type="button" class="secondary" hx-post="/settings/scan"
-              hx-target="#ports" hx-swap="outerHTML" style="margin-top:8px;">Scan for USB nodes</button>
-      <div style="margin-top:8px;">{% include "_ports.html" %}</div>
+              hx-vals='{"target":"serial_port"}' hx-target="#ports-serial_port"
+              hx-swap="outerHTML" style="margin-top:8px;">Scan for USB ports</button>
+      <div style="margin-top:8px;">{% set target = 'serial_port' %}{% include "_ports.html" %}</div>
       <label>Network address (host or host:port) - for the Network option</label>
       <input name="meshtastic_host" value="{{ mt_host }}" placeholder="192.168.1.50">
     </div>
@@ -94,9 +95,13 @@
         <div><label>Channel index</label>
           <input name="meshcore_channel" type="number" min="0" value="{{ mc_channel }}"></div>
       </div>
-      <label>USB serial port</label>
-      <input name="meshcore_port" value="{{ mc_port }}"
-             placeholder="/dev/ttyACM0 · /dev/ttyUSB0">
+      <label>USB serial port (COM3 on Windows · /dev/ttyUSB0 · /dev/ttyACM0)</label>
+      <input id="meshcore_port" name="meshcore_port" value="{{ mc_port }}"
+             placeholder="click Scan, then Use — or type it">
+      <button type="button" class="secondary" hx-post="/settings/scan"
+              hx-vals='{"target":"meshcore_port"}' hx-target="#ports-meshcore_port"
+              hx-swap="outerHTML" style="margin-top:8px;">Scan for USB ports</button>
+      <div style="margin-top:8px;">{% set target = 'meshcore_port' %}{% include "_ports.html" %}</div>
       <label>Network address host:port - for the Network option</label>
       <input name="meshcore_host" value="{{ mc_host }}" placeholder="192.168.1.51:4000">
     </div>
