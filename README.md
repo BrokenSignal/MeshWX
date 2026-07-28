@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <b>Status: Beta (v1.0.0-beta).</b> Tested on a Heltec V3 (Meshtastic) and a Seeed Tracker T1000-E (MeshCore).
+  <b>Status: Beta (v1.0.0-beta).</b> Tested on a Heltec V3 and a Seeed Tracker T1000-E.
 </p>
 
 ---
@@ -22,8 +22,7 @@
 </p>
 
 > [!NOTE]
-> **MeshWX is in beta and under active testing.** It has been verified on a **Heltec V3**
-> (Meshtastic) and a **Seeed Tracker T1000-E** (MeshCore). Other Meshtastic and MeshCore
+> **MeshWX is in beta and under active testing.** It has been verified on a **Heltec V3** and a **Seeed Tracker T1000-E**. Other Meshtastic and MeshCore
 > compatible boards should work but are not tested yet, so expect rough edges. Please report
 > what does and does not work via [Issues](../../issues).
 
@@ -121,8 +120,8 @@ No Python install required. Windows may warn about an unrecognized app the first
   port on replug; leave the port blank to auto-discover, or set it.
 - **MeshCore**: flash the board with the **USB (companion)** firmware, *not* repeater
   firmware. Repeater firmware exposes no serial API, so MeshWX can't drive it.
-- **Tested hardware.** So far MeshWX is verified on a Heltec V3 (Meshtastic) and a Seeed
-  Tracker T1000-E (MeshCore). Other compatible boards should work; if you run one, please
+- **Tested hardware.** So far MeshWX is verified on a Heltec V3 and a Seeed
+  Tracker T1000-E. Other compatible boards should work; if you run one, please
   open an [issue](../../issues) and let me know how it went.
 
 ## Configuration
