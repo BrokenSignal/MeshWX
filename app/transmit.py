@@ -94,9 +94,8 @@ class MeshCoreTransmitter(Transmitter):
             self._mc = await MeshCore.create_serial(
                 self.port, self.baud, default_timeout=6.0, auto_reconnect=True)
         if self._mc is None:
-            raise RuntimeError(
-                "no response from MeshCore node - is it flashed with the USB "
-                "companion firmware (not repeater)?")
+            where = self.host if self.conn == "tcp" else self.port
+            raise RuntimeError("no response from MeshCore node on %s" % (where or "(unset)"))
 
     async def send_text(self, text: str, channel: int) -> None:
         if self._mc is None:

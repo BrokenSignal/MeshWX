@@ -35,19 +35,6 @@
        border-radius:8px;margin-top:12px;"></pre>
 </div>
 
-<div class="panel">
-  <h3>Recent errors</h3>
-  <table>
-    <thead><tr><th>Time</th><th>Source</th><th>Message</th></tr></thead>
-    <tbody>
-      {% for e in errors %}
-      <tr><td class="mono">{{ e["ts"] }}</td><td>{{ e["source"] }}</td>
-          <td class="hint">{{ e["message"] }}</td></tr>
-      {% else %}
-      <tr><td colspan="3" class="hint">No errors recorded.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+{% include "_errors.html" %}
 {% endblock %}
 

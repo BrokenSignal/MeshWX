@@ -1,0 +1,21 @@
+<div class="panel" id="errors-panel">
+  <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;">
+    <h3>Recent errors</h3>
+    {% if errors %}
+    <button class="secondary" hx-post="/troubleshoot/clear-errors"
+            hx-target="#errors-panel" hx-swap="outerHTML"
+            hx-confirm="Clear the error log?">Clear errors</button>
+    {% endif %}
+  </div>
+  <table>
+    <thead><tr><th>Time</th><th>Source</th><th>Message</th></tr></thead>
+    <tbody>
+      {% for e in errors %}
+      <tr><td class="mono">{{ e["ts"] }}</td><td>{{ e["source"] }}</td>
+          <td class="hint">{{ e["message"] }}</td></tr>
+      {% else %}
+      <tr><td colspan="3" class="hint">No errors recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

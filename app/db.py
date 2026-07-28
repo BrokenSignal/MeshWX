@@ -300,6 +300,12 @@ class Database:
                 "SELECT * FROM errors ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
 
+    def clear_errors(self) -> int:
+        with self._lock:
+            cur = self._conn.execute("DELETE FROM errors")
+            self._conn.commit()
+            return cur.rowcount
+
     # ---- events (dashboard feed) ---------------------------------------
     def add_event(self, level: str, message: str) -> None:
         with self._lock:

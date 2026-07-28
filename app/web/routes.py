@@ -357,6 +357,12 @@ async def troubleshoot(request: Request):
                   transports=_tx(request).status())
 
 
+@router.post("/troubleshoot/clear-errors", response_class=HTMLResponse)
+async def clear_errors(request: Request):
+    _db(request).clear_errors()
+    return render(request, "_errors.html", errors=[])
+
+
 @router.post("/troubleshoot/test", response_class=HTMLResponse)
 async def send_test(request: Request):
     tx = _tx(request)

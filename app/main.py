@@ -81,7 +81,14 @@ app = create_app()
 
 
 def main() -> None:
+    import sys
     import uvicorn
+
+    # On Windows, asyncio defaults to the ProactorEventLoop, but the MeshCore
+    # serial layer (serial_asyncio) only works on the SelectorEventLoop. Without
+    # this, MeshCore serial never connects on Windows ("no response").
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     cfg = load_bootstrap()
     uvicorn.run(app, host=cfg.http_host, port=cfg.http_port, log_config=None)
