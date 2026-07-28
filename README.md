@@ -13,6 +13,10 @@
 
 ---
 
+<p align="center">
+  <img src="docs/dashboard.png" alt="MeshWX dashboard - live broadcaster status, recent alerts, and node health" width="900">
+</p>
+
 > [!WARNING]
 > **MeshWX is a supplemental tool, not a certified warning system.** It depends on your
 > internet connection to reach the NWS API, on your hardware, and on LoRa propagation.
