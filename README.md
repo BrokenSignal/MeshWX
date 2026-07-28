@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <b>Status: Beta (v1.0.0-beta).</b> Tested on a Heltec V3 and a Seeed Tracker T1000-E.
+  <b>Status: Beta (v0.1.0).</b> Tested on a Heltec V3 and a Seeed Tracker T1000-E.
 </p>
 
 ---
