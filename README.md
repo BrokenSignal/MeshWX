@@ -38,7 +38,8 @@ channel. Built after living through Hurricane Helene's comms blackout.
   alert goes to each enabled radio on its own channel.
 - **Dead-simple setup.** Pick your state and check your counties; the NWS zones populate
   automatically. Choose which alerts to send from checklists - no cryptic codes to type.
-- **Smart filtering.** Broadcast all Warnings by default; add Watches/Advisories à la carte.
+- **Smart filtering.** Broadcast all Warnings plus Tornado Watch by default; add other
+  Watches/Advisories à la carte.
 - **No spam.** Never rebroadcasts the same alert; sends one concise *update* when a warning
   materially changes and a *cancellation* when it clears. Old state auto-expires.
 - **Fits a LoRa packet.** Alerts are trimmed to ≤195 bytes, e.g.

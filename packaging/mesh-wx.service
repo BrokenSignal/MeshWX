@@ -1,5 +1,5 @@
 [Unit]
-Description=MeshWX — NWS weather alerts over Meshtastic / MeshCore
+Description=MeshWX - NWS weather alerts over Meshtastic / MeshCore
 After=network-online.target
 Wants=network-online.target
 
