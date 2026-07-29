@@ -170,6 +170,15 @@ Stack: FastAPI + Uvicorn, server-rendered Jinja templates + htmx, SQLite. No bui
 The filter, formatter (byte-cap), and dedupe logic are covered by unit tests backed by
 captured NWS alert JSON fixtures under `tests/fixtures/`, with no serial/network deps.
 
+## Credits
+
+Thanks to the people helping make MeshWX real:
+
+- **Matthew Crook (W1MRC)**: testing and outreach.
+
+More hands are welcome. If you test MeshWX, help spread the word, or run it on your own
+mesh, open an [issue](../../issues) or pull request and you'll be added here.
+
 ## License
 
 [MIT](LICENSE). Free to use, modify, and share. Contributions welcome.
