@@ -170,19 +170,6 @@ Stack: FastAPI + Uvicorn, server-rendered Jinja templates + htmx, SQLite. No bui
 The filter, formatter (byte-cap), and dedupe logic are covered by unit tests backed by
 captured NWS alert JSON fixtures under `tests/fixtures/`, with no serial/network deps.
 
-## Credits
-
-Thanks to the people helping make MeshWX real:
-
-- **Matthew Crook (W1MRC)**: testing and outreach.
-
-More hands are welcome. If you test MeshWX, help spread the word, or run it on your own
-mesh, open an [issue](../../issues) or pull request and you'll be added here.
-
-## License
-
-[MIT](LICENSE). Free to use, modify, and share. Contributions welcome.
-
 ## Keep it running when the grid goes down
 
 MeshWX only helps if it is still up when the weather turns bad, which is exactly
@@ -201,5 +188,18 @@ power, and a path to the National Weather Service. Plan for both.
 - **Know the limit.** With no internet and no backup path, MeshWX cannot fetch new
   alerts. It is a bridge from the NWS to your mesh, not a weather source of its own.
   Keep a NOAA Weather Radio as the offline fallback.
+
+## Credits
+
+Thanks to the people helping make MeshWX real:
+
+- **Matthew Crook (W1MRC)**: testing and outreach.
+
+More hands are welcome. If you test MeshWX, help spread the word, or run it on your own
+mesh, open an [issue](../../issues) or pull request and you'll be added here.
+
+## License
+
+[MIT](LICENSE). Free to use, modify, and share. Contributions welcome.
 
 <p align="center"><sub>Developed by <a href="https://BrokenSignal.tv/MeshWX">BrokenSignal</a></sub></p>
