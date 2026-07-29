@@ -41,6 +41,25 @@ mesh has no way to *know* a warning was issued. MeshWX bridges that gap: it poll
 worth sending, formats it to fit a LoRa packet, and transmits it to everyone on your
 channel. Built after living through Hurricane Helene's comms blackout.
 
+## Keep it running when the grid goes down
+
+MeshWX only helps if it is still up when the weather turns bad, which is exactly
+when grid power and internet tend to fail. The mesh side keeps relaying on its own,
+but MeshWX itself needs two things to *know* an alert was issued and push it out:
+power, and a path to the National Weather Service. Plan for both.
+
+- **Power: run it on battery, solar, or a UPS.** A Raspberry Pi and a LoRa radio
+  draw very little, so a small solar panel with a battery, or even a modest UPS, can
+  keep MeshWX broadcasting for hours or days after the power drops. Put your listening
+  nodes on backup power too, since a warning nobody's radio can receive helps no one.
+- **Internet: use a resilient link like Starlink.** MeshWX polls the NWS over the
+  internet, so if your cable or fiber dies with the grid, it goes quiet. A satellite
+  link such as Starlink, on its own battery or solar, keeps alerts flowing when
+  terrestrial service is down.
+- **Know the limit.** With no internet and no backup path, MeshWX cannot fetch new
+  alerts. It is a bridge from the NWS to your mesh, not a weather source of its own.
+  Keep a NOAA Weather Radio as the offline fallback.
+
 ## Features
 
 - **Dual radio, side by side.** Run Meshtastic, MeshCore, or **both at once**: every
