@@ -72,12 +72,15 @@ DEFAULT_SETTINGS: dict = {
     "meshtastic_enabled": True,
     "meshtastic_conn": "serial",
     "meshtastic_host": "",
+    "meshtastic_repeat": 2,
     "meshcore_enabled": False,
     "meshcore_conn": "serial",
     "meshcore_port": "",
     "meshcore_host": "",
     "meshcore_channel": 0,
+    "meshcore_repeat": 2,
     "dry_run": True,
+    "test_channel": 1,   # tests + manual sends use this channel (keep off the live alert channel 0)
     "display_timezone": "America/New_York",
     # Filter rules (editable). An alert is INCLUDED when its event is in
     # filter_include_exact OR ends with any suffix in filter_include_suffix,
@@ -90,5 +93,6 @@ DEFAULT_SETTINGS: dict = {
 POLL_INTERVAL_MIN = 60
 MAX_PAYLOAD_BYTES = 195
 BURST_GAP_SECONDS = 30
+REPEAT_GAP_SECONDS = 5   # gap between repeated copies of the same alert
 QUEUE_MAX = 20
 STATE_EXPIRY_HOURS = 48

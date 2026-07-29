@@ -72,6 +72,8 @@
           </select></div>
         <div><label>Channel index (0 = LongFast)</label>
           <input name="channel_index" type="number" min="0" value="{{ mt_channel }}"></div>
+        <div><label>Repeat each alert (1-5)</label>
+          <input name="meshtastic_repeat" type="number" min="1" max="5" value="{{ mt_repeat }}"></div>
       </div>
       <label>USB serial port (COM3 on Windows &middot; /dev/ttyUSB0 &middot; /dev/ttyACM0)</label>
       <input id="serial_port" name="serial_port" value="{{ mt_port }}"
@@ -94,6 +96,8 @@
           </select></div>
         <div><label>Channel index</label>
           <input name="meshcore_channel" type="number" min="0" value="{{ mc_channel }}"></div>
+        <div><label>Repeat each alert (1-5)</label>
+          <input name="meshcore_repeat" type="number" min="1" max="5" value="{{ mc_repeat }}"></div>
       </div>
       <label>USB serial port (COM3 on Windows &middot; /dev/ttyUSB0 &middot; /dev/ttyACM0)</label>
       <input id="meshcore_port" name="meshcore_port" value="{{ mc_port }}"
@@ -117,6 +121,8 @@
         <input name="nws_contact" value="{{ s.nws_contact }}" required></div>
       <div><label>Display timezone (IANA)</label>
         <input name="display_timezone" value="{{ s.display_timezone }}" required></div>
+      <div><label>Test channel (tests/manual sends, not live alerts)</label>
+        <input name="test_channel" type="number" min="0" value="{{ test_channel }}"></div>
     </div>
   </div>
 

@@ -99,7 +99,7 @@ Manage with `sudo systemctl restart mesh-wx` and `journalctl -u mesh-wx -f`.
 3. Your browser opens to the dashboard automatically. Keep the console window open;
    close it to stop MeshWX.
 
-No Python install required. Windows may warn about an unrecognized app the first time -
+No Python install required. Windows may warn about an unrecognized app the first time:
 "More info → Run anyway" (the build is unsigned).
 
 ## First run
@@ -123,6 +123,24 @@ No Python install required. Windows may warn about an unrecognized app the first
 - **Tested hardware.** So far MeshWX is verified on a Heltec V3 and a Seeed
   Tracker T1000-E. Other compatible boards should work; if you run one, please
   open an [issue](../../issues) and let me know how it went.
+
+### Channels: live vs. test
+
+MeshWX keeps testing off the air people are actually watching:
+
+- **Channel 0 is the live channel**: real NWS alerts broadcast there (each radio's
+  alert channel, index 0 by default).
+- **Channel 1 is the test channel**: the per-radio **Test** buttons and the manual-send
+  page transmit there, so testing never clutters the live alert channel.
+
+Both are set in **Settings** (per-radio alert channel, plus a global **Test channel**).
+Point your listening node at channel 0 for real alerts, or channel 1 to watch tests.
+
+### Repeat sends
+
+LoRa channel broadcasts have no acknowledgement, so a single packet can be dropped. Each
+radio can send every alert more than once (**Repeat each alert**, default 2), spaced a few
+seconds apart, so one lost packet doesn't mean a missed warning. Set per radio in Settings.
 
 ## Configuration
 

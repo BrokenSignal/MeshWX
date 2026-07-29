@@ -263,6 +263,9 @@ async def settings_page(request: Request):
         mc_port=s.get("meshcore_port", "") or "",
         mc_host=s.get("meshcore_host", "") or "",
         mc_channel=int(s.get("meshcore_channel", 0) or 0),
+        mt_repeat=int(s.get("meshtastic_repeat", 2) or 2),
+        mc_repeat=int(s.get("meshcore_repeat", 2) or 2),
+        test_channel=int(s.get("test_channel", 1) or 1),
     )
 
 
@@ -287,7 +290,15 @@ async def save_settings(
     meshcore_port: str = Form(""),
     meshcore_host: str = Form(""),
     meshcore_channel: int = Form(0),
+    meshtastic_repeat: int = Form(2),
+    meshcore_repeat: int = Form(2),
+    test_channel: int = Form(1),
 ):
+    def _rep(v):
+        try:
+            return max(1, min(5, int(v)))
+        except (TypeError, ValueError):
+            return 2
     db, tx, poller = _db(request), _tx(request), _poller(request)
     interval = max(POLL_INTERVAL_MIN, int(poll_interval))
 
@@ -312,6 +323,9 @@ async def save_settings(
     db.set_setting("meshcore_port", meshcore_port.strip())
     db.set_setting("meshcore_host", meshcore_host.strip())
     db.set_setting("meshcore_channel", int(meshcore_channel))
+    db.set_setting("meshtastic_repeat", _rep(meshtastic_repeat))
+    db.set_setting("meshcore_repeat", _rep(meshcore_repeat))
+    db.set_setting("test_channel", int(test_channel))
 
     # Rebuild transports from the new settings and (re)connect the enabled ones.
     await tx.reconfigure()

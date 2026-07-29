@@ -14,7 +14,7 @@ import logging
 from collections import deque
 from dataclasses import dataclass
 
-from .config import BURST_GAP_SECONDS, QUEUE_MAX
+from .config import BURST_GAP_SECONDS, REPEAT_GAP_SECONDS, QUEUE_MAX
 
 logger = logging.getLogger("mesh_wx.tx")
 
@@ -138,6 +138,7 @@ class Transport:
     channel: int
     target: str                   # serial path or host - display + "configured?" check
     make: object                  # callable() -> Transmitter
+    repeat: int = 1               # send each alert this many times (LoRa has no ACK)
     tx: Transmitter | None = None
     connected: bool = False
     error: str = ""
@@ -152,6 +153,12 @@ def _build_transports(db) -> dict:
     def g(k, d=None):
         return db.get_setting(k, d)
 
+    def rep(k):
+        try:
+            return max(1, min(5, int(g(k, 2) or 2)))
+        except (TypeError, ValueError):
+            return 2
+
     mt_conn = g("meshtastic_conn", "serial") or "serial"
     mt = Transport(
         name="meshtastic", label="Meshtastic",
@@ -159,6 +166,7 @@ def _build_transports(db) -> dict:
         conn=mt_conn, channel=int(g("channel_index", 0) or 0),
         target=(g("meshtastic_host", "") if mt_conn == "tcp" else g("serial_port", "")) or "",
         make=lambda: MeshtasticTransmitter(mt_conn, g("serial_port", "") or "", g("meshtastic_host", "") or ""),
+        repeat=rep("meshtastic_repeat"),
     )
     mc_conn = g("meshcore_conn", "serial") or "serial"
     mc = Transport(
@@ -167,6 +175,7 @@ def _build_transports(db) -> dict:
         conn=mc_conn, channel=int(g("meshcore_channel", 0) or 0),
         target=(g("meshcore_host", "") if mc_conn == "tcp" else g("meshcore_port", "")) or "",
         make=lambda: MeshCoreTransmitter(mc_conn, g("meshcore_port", "") or "", g("meshcore_host", "") or ""),
+        repeat=rep("meshcore_repeat"),
     )
     return {"meshtastic": mt, "meshcore": mc}
 
@@ -290,41 +299,65 @@ class TransmitManager:
         any_ok = False
         blen = len(text.encode())
         async with self._lock:
+            # Automated alerts go on the radio's alert channel; a manual send
+            # (test button / manual page) goes on the test channel so it never
+            # clutters the live alert channel.
+            test_ch = self._test_channel()
             for t in self._transports.values():
                 if not t.enabled:
                     continue
+                ch = test_ch if manual else t.channel
                 if not await self._ensure(t):
-                    self._db.add_transmit_log(t.channel, blen, False, text, manual,
+                    self._db.add_transmit_log(ch, blen, False, text, manual,
                                               error=t.error, transport=t.name)
                     continue
-                try:
-                    await t.tx.send_text(text, t.channel)
-                    self._db.add_transmit_log(t.channel, blen, True, text, manual,
-                                              transport=t.name)
-                    any_ok = True
-                    logger.info("transmitted via %s", t.name,
-                                extra={"channel": t.channel, "bytes": blen,
-                                       "action": "manual" if manual else "auto"})
-                except Exception as exc:
-                    t.error = "send failed: %s" % exc
-                    t.connected = False
+                # LoRa channel broadcasts are unacknowledged, so send each alert
+                # t.repeat times (spaced out) to survive a dropped packet.
+                sends = max(1, t.repeat)
+                broke = False
+                for i in range(sends):
+                    if i > 0:
+                        await asyncio.sleep(REPEAT_GAP_SECONDS)
                     try:
-                        await t.tx.close()
-                    except Exception:
-                        pass
-                    t.tx = None
-                    self._db.add_transmit_log(t.channel, blen, False, text, manual,
-                                              error=str(exc), transport=t.name)
-                    self._db.add_error(t.name, t.error)
-                    logger.warning("%s send failed: %s", t.name, exc)
+                        await t.tx.send_text(text, ch)
+                        self._db.add_transmit_log(ch, blen, True, text, manual,
+                                                  transport=t.name)
+                        any_ok = True
+                        logger.info("transmitted via %s (%d/%d)", t.name, i + 1, sends,
+                                    extra={"channel": ch, "bytes": blen,
+                                           "action": "manual" if manual else "auto"})
+                    except Exception as exc:
+                        t.error = "send failed: %s" % exc
+                        t.connected = False
+                        try:
+                            await t.tx.close()
+                        except Exception:
+                            pass
+                        t.tx = None
+                        self._db.add_transmit_log(ch, blen, False, text, manual,
+                                                  error=str(exc), transport=t.name)
+                        self._db.add_error(t.name, t.error)
+                        logger.warning("%s send failed: %s", t.name, exc)
+                        broke = True
+                        break
+                if broke:
+                    continue
         return any_ok
 
     async def send_manual(self, text: str, channel: int | None = None) -> bool:
         return await self._send_all(text, manual=True)
 
+    def _test_channel(self) -> int:
+        """Channel used for tests + manual sends (kept off the live alert channel)."""
+        try:
+            return int(self._db.get_setting("test_channel", 1) or 1)
+        except (TypeError, ValueError):
+            return 1
+
     async def send_to(self, name: str, text: str) -> tuple[bool, str]:
         """Key up a single named radio (bench testing). Returns (ok, error)."""
         blen = len(text.encode())
+        ch = self._test_channel()   # tests go on the test channel, not the alert channel
         async with self._lock:
             t = self._transports.get(name)
             if t is None:
@@ -332,14 +365,14 @@ class TransmitManager:
             if not t.enabled:
                 return False, "%s is disabled" % t.label
             if not await self._ensure(t):
-                self._db.add_transmit_log(t.channel, blen, False, text, True,
+                self._db.add_transmit_log(ch, blen, False, text, True,
                                           error=t.error, transport=t.name)
                 return False, t.error or "not connected"
             try:
-                await t.tx.send_text(text, t.channel)
-                self._db.add_transmit_log(t.channel, blen, True, text, True,
+                await t.tx.send_text(text, ch)
+                self._db.add_transmit_log(ch, blen, True, text, True,
                                           transport=t.name)
-                logger.info("test transmitted via %s", t.name)
+                logger.info("test transmitted via %s on ch %d", t.name, ch)
                 return True, ""
             except Exception as exc:
                 t.error = "send failed: %s" % exc
@@ -349,7 +382,7 @@ class TransmitManager:
                 except Exception:
                     pass
                 t.tx = None
-                self._db.add_transmit_log(t.channel, blen, False, text, True,
+                self._db.add_transmit_log(ch, blen, False, text, True,
                                           error=str(exc), transport=t.name)
                 self._db.add_error(t.name, t.error)
                 logger.warning("%s test send failed: %s", t.name, exc)
