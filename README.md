@@ -114,6 +114,12 @@ No Python install required. Windows may warn about an unrecognized app the first
 6. Save, then go to **Troubleshoot → Send test** to confirm each radio actually transmits.
 7. When you're confident, turn **dry-run off** on the dashboard to go live.
 
+<p align="center">
+  <a href="docs/settings-1.png"><img src="docs/settings-1.png" alt="MeshWX Settings: coverage area and which alerts to broadcast" width="47%"></a>
+  <a href="docs/settings-2.png"><img src="docs/settings-2.png" alt="MeshWX Settings: radios, channels, and general options" width="47%"></a>
+</p>
+<p align="center"><sub>The Settings page: pick counties and alert types (left), set up radios and channels (right). Click either to enlarge.</sub></p>
+
 ### Radio notes
 
 - **Meshtastic**: any Meshtastic device on USB serial. The board can renumber its serial
