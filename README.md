@@ -93,6 +93,9 @@ sudo ./packaging/install-linux.sh
 
 This creates a virtualenv, adds you to the `dialout` group for serial access, and installs
 a `systemd` service that starts on boot. Opens on `http://<pi>:8110`.
+
+Tested on 64-bit Raspberry Pi OS Bookworm (Python 3.11): every dependency installs as a
+prebuilt `aarch64` wheel, so no compiler or Rust toolchain is needed.
 Manage with `sudo systemctl restart mesh-wx` and `journalctl -u mesh-wx -f`.
 
 ### 🪟 Windows
