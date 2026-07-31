@@ -59,60 +59,81 @@
 
   <div class="panel">
     <h3>Radios</h3>
-    <p class="hint">Run <b>Meshtastic</b> and/or <b>MeshCore</b> side by side. Enable either or both -
-      every alert is broadcast to each enabled radio on its own channel.</p>
+    <p class="hint">Run <b>Meshtastic</b> and/or <b>MeshCore</b> side by side. For each: pick the
+      connection, click <b>Connect &amp; load channels</b>, then choose which channel carries live
+      alerts and which carries test messages.</p>
 
     <div class="radio-card">
       <label class="chk"><input type="checkbox" name="meshtastic_enabled" {% if mt_enabled %}checked{% endif %}> <b>Meshtastic</b></label>
       <div class="row" style="margin-top:12px;">
         <div><label>Connection</label>
-          <select name="meshtastic_conn">
+          <select name="meshtastic_conn" onchange="mwxConn('mt', this.value)">
             <option value="serial" {% if mt_conn=='serial' %}selected{% endif %}>USB (serial)</option>
-            <option value="tcp" {% if mt_conn=='tcp' %}selected{% endif %}>Network (WiFi / TCP)</option>
+            <option value="tcp" {% if mt_conn=='tcp' %}selected{% endif %}>Network (IP / TCP)</option>
           </select></div>
-        <div><label>Channel index (0 = LongFast)</label>
-          <input name="channel_index" type="number" min="0" value="{{ mt_channel }}"></div>
         <div><label>Repeat each alert (1-5)</label>
           <input name="meshtastic_repeat" type="number" min="1" max="5" value="{{ mt_repeat }}"></div>
       </div>
-      <label>USB serial port (COM3 on Windows &middot; /dev/ttyUSB0 &middot; /dev/ttyACM0)</label>
-      <input id="serial_port" name="serial_port" value="{{ mt_port }}"
-             placeholder="click Scan, then Use - or type it">
-      <button type="button" class="secondary" hx-post="/settings/scan"
-              hx-vals='{"target":"serial_port"}' hx-target="#ports-serial_port"
-              hx-swap="outerHTML" style="margin-top:8px;">Scan for USB ports</button>
-      <div style="margin-top:8px;">{% set target = 'serial_port' %}{% include "_ports.html" %}</div>
-      <label>Network address (host or host:port) - for the Network option</label>
-      <input name="meshtastic_host" value="{{ mt_host }}" placeholder="192.168.1.50">
+
+      <div id="mt-usb" style="display:{{ 'none' if mt_conn=='tcp' else 'block' }}">
+        <label>USB serial port (COM3 on Windows &middot; /dev/ttyUSB0 &middot; /dev/ttyACM0)</label>
+        <input id="serial_port" name="serial_port" value="{{ mt_port }}"
+               placeholder="click Scan, then Use - or type it">
+        <button type="button" class="secondary" hx-post="/settings/scan"
+                hx-vals='{"target":"serial_port"}' hx-target="#ports-serial_port"
+                hx-swap="outerHTML" style="margin-top:8px;">Scan for USB ports</button>
+        <div style="margin-top:8px;">{% set target = 'serial_port' %}{% include "_ports.html" %}</div>
+      </div>
+      <div id="mt-ip" style="display:{{ 'block' if mt_conn=='tcp' else 'none' }}">
+        <label>Network address (host or host:port)</label>
+        <input name="meshtastic_host" value="{{ mt_host }}" placeholder="192.168.1.50">
+      </div>
+
+      {% set radio='meshtastic' %}{% set live_field='channel_index' %}{% set test_field='meshtastic_test_channel' %}{% set live_val=mt_channel %}{% set test_val=mt_test %}{% set channels=mt_channels %}{% set connected=mt_connected %}{% set model=mt_model %}{% set error='' %}
+      <div style="margin-top:10px;">{% include "_radio_channels.html" %}</div>
     </div>
 
     <div class="radio-card">
       <label class="chk"><input type="checkbox" name="meshcore_enabled" {% if mc_enabled %}checked{% endif %}> <b>MeshCore</b></label>
       <div class="row" style="margin-top:12px;">
         <div><label>Connection</label>
-          <select name="meshcore_conn">
+          <select name="meshcore_conn" onchange="mwxConn('mc', this.value)">
             <option value="serial" {% if mc_conn=='serial' %}selected{% endif %}>USB (serial)</option>
-            <option value="tcp" {% if mc_conn=='tcp' %}selected{% endif %}>Network (TCP)</option>
+            <option value="tcp" {% if mc_conn=='tcp' %}selected{% endif %}>Network (IP / TCP)</option>
           </select></div>
-        <div><label>Channel index</label>
-          <input name="meshcore_channel" type="number" min="0" value="{{ mc_channel }}"></div>
         <div><label>Repeat each alert (1-5)</label>
           <input name="meshcore_repeat" type="number" min="1" max="5" value="{{ mc_repeat }}"></div>
       </div>
-      <label>USB serial port (COM3 on Windows &middot; /dev/ttyUSB0 &middot; /dev/ttyACM0)</label>
-      <input id="meshcore_port" name="meshcore_port" value="{{ mc_port }}"
-             placeholder="click Scan, then Use - or type it">
-      <button type="button" class="secondary" hx-post="/settings/scan"
-              hx-vals='{"target":"meshcore_port"}' hx-target="#ports-meshcore_port"
-              hx-swap="outerHTML" style="margin-top:8px;">Scan for USB ports</button>
-      <div style="margin-top:8px;">{% set target = 'meshcore_port' %}{% include "_ports.html" %}</div>
-      <label>Network address host:port - for the Network option</label>
-      <input name="meshcore_host" value="{{ mc_host }}" placeholder="192.168.1.51:4000">
+
+      <div id="mc-usb" style="display:{{ 'none' if mc_conn=='tcp' else 'block' }}">
+        <label>USB serial port (COM3 on Windows &middot; /dev/ttyUSB0 &middot; /dev/ttyACM0)</label>
+        <input id="meshcore_port" name="meshcore_port" value="{{ mc_port }}"
+               placeholder="click Scan, then Use - or type it">
+        <button type="button" class="secondary" hx-post="/settings/scan"
+                hx-vals='{"target":"meshcore_port"}' hx-target="#ports-meshcore_port"
+                hx-swap="outerHTML" style="margin-top:8px;">Scan for USB ports</button>
+        <div style="margin-top:8px;">{% set target = 'meshcore_port' %}{% include "_ports.html" %}</div>
+      </div>
+      <div id="mc-ip" style="display:{{ 'block' if mc_conn=='tcp' else 'none' }}">
+        <label>Network address (host:port)</label>
+        <input name="meshcore_host" value="{{ mc_host }}" placeholder="192.168.1.51:4000">
+      </div>
+
+      {% set radio='meshcore' %}{% set live_field='meshcore_channel' %}{% set test_field='meshcore_test_channel' %}{% set live_val=mc_channel %}{% set test_val=mc_test %}{% set channels=mc_channels %}{% set connected=mc_connected %}{% set model=mc_model %}{% set error='' %}
+      <div style="margin-top:10px;">{% include "_radio_channels.html" %}</div>
     </div>
   </div>
 
+  <script>
+    function mwxConn(p, v){
+      var usb = document.getElementById(p+'-usb'), ip = document.getElementById(p+'-ip');
+      if (usb) usb.style.display = (v==='tcp') ? 'none' : 'block';
+      if (ip)  ip.style.display  = (v==='tcp') ? 'block' : 'none';
+    }
+  </script>
+
   <div class="panel">
-    <h3>General</h3>
+    <h3>NOAA</h3>
     <div class="row">
       <div><label>Poll interval (seconds, min {{ min_interval }})</label>
         <input name="poll_interval" type="number" min="{{ min_interval }}"
@@ -121,8 +142,6 @@
         <input name="nws_contact" value="{{ s.nws_contact }}" required></div>
       <div><label>Display timezone (IANA)</label>
         <input name="display_timezone" value="{{ s.display_timezone }}" required></div>
-      <div><label>Test channel (tests/manual sends, not live alerts)</label>
-        <input name="test_channel" type="number" min="0" value="{{ test_channel }}"></div>
     </div>
   </div>
 

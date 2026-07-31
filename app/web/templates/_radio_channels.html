@@ -1,0 +1,41 @@
+<div id="{{ radio }}-channels">
+  {% set opts = channels or [] %}
+  {% set include_sel = "[name='meshtastic_conn'],[name='serial_port'],[name='meshtastic_host']" if radio == 'meshtastic' else "[name='meshcore_conn'],[name='meshcore_port'],[name='meshcore_host']" %}
+
+  <button type="button" class="{% if connected %}secondary{% endif %}"
+          hx-post="/settings/channels/{{ radio }}" hx-include="{{ include_sel }}"
+          hx-target="#{{ radio }}-channels" hx-swap="outerHTML"
+          hx-indicator="#{{ radio }}-load">
+    {% if connected %}Reconnect &amp; reload channels{% else %}Connect &amp; load channels{% endif %}
+  </button>
+  <span id="{{ radio }}-load" class="htmx-indicator hint"> reading from the radio&hellip;</span>
+
+  <div style="margin:.7rem 0 .2rem;">
+    {% if connected %}
+      <span class="dot ok">Connected</span>{% if model %} <span class="hint">{{ model }}</span>{% endif %}
+    {% elif error %}
+      <span class="dot bad">Not connected</span> <span class="hint">{{ error }}</span>
+    {% else %}
+      <span class="hint">Not connected. Click <b>Connect &amp; load channels</b> to read this radio.</span>
+    {% endif %}
+  </div>
+
+  <div class="row">
+    <div><label>Live channel (real alerts)</label>
+      <select name="{{ live_field }}">
+        {% if opts %}
+          {% for c in opts %}<option value="{{ c.index }}" {% if c.index == live_val %}selected{% endif %}>{{ c.index }}: {{ c.name }}</option>{% endfor %}
+        {% else %}
+          <option value="{{ live_val }}" selected>{{ live_val }} (load channels for names)</option>
+        {% endif %}
+      </select></div>
+    <div><label>Test channel (tests &amp; manual sends)</label>
+      <select name="{{ test_field }}">
+        {% if opts %}
+          {% for c in opts %}<option value="{{ c.index }}" {% if c.index == test_val %}selected{% endif %}>{{ c.index }}: {{ c.name }}</option>{% endfor %}
+        {% else %}
+          <option value="{{ test_val }}" selected>{{ test_val }} (load channels for names)</option>
+        {% endif %}
+      </select></div>
+  </div>
+</div>

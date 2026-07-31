@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <b>Status: Beta (v0.1.0).</b> Tested on a Heltec V3 and a Seeed Tracker T1000-E.
+  <b>Status: v1.0.0.</b> Verified on a Heltec V3 for Meshtastic and MeshCore, over USB and over the network.
 </p>
 
 ---
@@ -22,9 +22,12 @@
 </p>
 
 > [!NOTE]
-> **MeshWX is in beta and under active testing.** It has been verified on a **Heltec V3** and a **Seeed Tracker T1000-E**. Other Meshtastic and MeshCore
-> compatible boards should work but are not tested yet, so expect rough edges. Please report
-> what does and does not work via [Issues](../../issues).
+> **Built for the whole mesh ecosystem.** MeshWX speaks the standard Meshtastic and MeshCore
+> serial and network protocols, so it is designed to run on the full range of boards those
+> firmwares support (Heltec, LILYGO, RAK, Station G2, Seeed, and more). It is verified today
+> on the Heltec V3 for both Meshtastic and MeshCore, over USB and over the network. As it is
+> confirmed on more hardware the list will grow, so please report how yours does via
+> [Issues](../../issues).
 
 > [!WARNING]
 > **MeshWX is a supplemental tool, not a certified warning system.** It depends on your
@@ -105,12 +108,12 @@ No Python install required. Windows may warn about an unrecognized app the first
 ## First run
 
 1. Open the dashboard, go to **Settings**.
-2. **General → NWS contact**: set this to your email address. The NWS API
+2. **NOAA → NWS contact**: set this to your email address. The NWS API
    [requires a contact string](https://www.weather.gov/documentation/services-web-api)
    in every request; leaving the default placeholder can get you rate-limited or blocked.
 3. **Coverage**: pick your state, check your counties.
 4. **What to broadcast**: leave *All Warnings* on; add any watches/advisories you want.
-5. **Radios**: enable Meshtastic and/or MeshCore and set each one's USB serial port and channel.
+5. **Radios**: enable Meshtastic and/or MeshCore. For each, choose **USB** or **network (IP/TCP)**, click **Connect and load channels**, then pick which channel carries live alerts and which carries test messages.
 6. Save, then go to **Troubleshoot → Send test** to confirm each radio actually transmits.
 7. When you're confident, turn **dry-run off** on the dashboard to go live.
 
@@ -122,13 +125,15 @@ No Python install required. Windows may warn about an unrecognized app the first
 
 ### Radio notes
 
-- **Meshtastic**: any Meshtastic device on USB serial. The board can renumber its serial
-  port on replug; leave the port blank to auto-discover, or set it.
+- **Meshtastic**: any Meshtastic node, over **USB serial** or over the **network (TCP/IP)**,
+  for example a WiFi connected node at its IP address (optionally `host:port`). On USB the
+  board can renumber its port on replug; leave the port blank to auto-discover, or set it.
 - **MeshCore**: flash the board with the **USB (companion)** firmware, *not* repeater
   firmware. Repeater firmware exposes no serial API, so MeshWX can't drive it.
-- **Tested hardware.** So far MeshWX is verified on a Heltec V3 and a Seeed
-  Tracker T1000-E. Other compatible boards should work; if you run one, please
-  open an [issue](../../issues) and let me know how it went.
+- **Tested hardware.** MeshWX 1.0.0 is verified on the **Heltec V3** for both Meshtastic and
+  MeshCore: Meshtastic over USB and over the network (TCP/IP), MeshCore over USB. Other
+  Meshtastic and MeshCore boards are expected to work the same way; if you run one, please
+  open an [issue](../../issues) and say how it went.
 
 ### Channels: live vs. test
 

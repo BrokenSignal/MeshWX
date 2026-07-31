@@ -51,6 +51,10 @@ def _poller(request: Request):
     return request.app.state.poller
 
 
+def _status_flag(request: Request, name: str) -> bool:
+    return any(s["connected"] for s in _tx(request).status() if s["name"] == name)
+
+
 def _status_ctx(request: Request) -> dict:
     db, tx, poller = _db(request), _tx(request), _poller(request)
     return {
@@ -265,7 +269,14 @@ async def settings_page(request: Request):
         mc_channel=int(s.get("meshcore_channel", 0) or 0),
         mt_repeat=int(s.get("meshtastic_repeat", 2) or 2),
         mc_repeat=int(s.get("meshcore_repeat", 2) or 2),
-        test_channel=int(s.get("test_channel", 1) or 1),
+        mt_test=int(s.get("meshtastic_test_channel", 1) or 1),
+        mc_test=int(s.get("meshcore_test_channel", 1) or 1),
+        mt_channels=s.get("meshtastic_channels", []) or [],
+        mc_channels=s.get("meshcore_channels", []) or [],
+        mt_connected=_status_flag(request, "meshtastic"),
+        mc_connected=_status_flag(request, "meshcore"),
+        mt_model=s.get("meshtastic_model", "") or "",
+        mc_model=s.get("meshcore_model", "") or "",
     )
 
 
@@ -292,7 +303,8 @@ async def save_settings(
     meshcore_channel: int = Form(0),
     meshtastic_repeat: int = Form(2),
     meshcore_repeat: int = Form(2),
-    test_channel: int = Form(1),
+    meshtastic_test_channel: int = Form(1),
+    meshcore_test_channel: int = Form(1),
 ):
     def _rep(v):
         try:
@@ -325,7 +337,8 @@ async def save_settings(
     db.set_setting("meshcore_channel", int(meshcore_channel))
     db.set_setting("meshtastic_repeat", _rep(meshtastic_repeat))
     db.set_setting("meshcore_repeat", _rep(meshcore_repeat))
-    db.set_setting("test_channel", int(test_channel))
+    db.set_setting("meshtastic_test_channel", int(meshtastic_test_channel))
+    db.set_setting("meshcore_test_channel", int(meshcore_test_channel))
 
     # Rebuild transports from the new settings and (re)connect the enabled ones.
     await tx.reconfigure()
@@ -341,6 +354,60 @@ async def scan_ports(request: Request, target: str = Form("serial_port")):
     # only allow the two known field ids to be scripted into the page
     field = target if target in ("serial_port", "meshcore_port") else "serial_port"
     return render(request, "_ports.html", ports=ports, target=field)
+
+
+_RADIO_FIELDS = {
+    "meshtastic": ("meshtastic_conn", "serial_port", "meshtastic_host",
+                   "channel_index", "meshtastic_test_channel"),
+    "meshcore":   ("meshcore_conn", "meshcore_port", "meshcore_host",
+                   "meshcore_channel", "meshcore_test_channel"),
+}
+
+
+_INCLUDE_SEL = {
+    "meshtastic": "[name='meshtastic_conn'],[name='serial_port'],[name='meshtastic_host']",
+    "meshcore": "[name='meshcore_conn'],[name='meshcore_port'],[name='meshcore_host']",
+}
+
+
+def _channel_ctx(db, tx, name, channels=None, model=None, error="", connected=None):
+    conn_f, port_f, host_f, live_f, test_f = _RADIO_FIELDS[name]
+    if channels is None:  # fall back to the last channels we read from this radio
+        channels = db.get_setting(name + "_channels", []) or []
+    if model is None:
+        model = db.get_setting(name + "_model", "") or ""
+    if connected is None:  # reflect the live transport's real state
+        connected = any(s["connected"] for s in tx.status() if s["name"] == name)
+    return dict(
+        radio=name, channels=channels, error=error, connected=connected, model=model,
+        include_sel=_INCLUDE_SEL[name],
+        live_field=live_f, test_field=test_f,
+        live_val=int(db.get_setting(live_f, 0) or 0),
+        test_val=int(db.get_setting(test_f, 1) or 1),
+    )
+
+
+@router.post("/settings/channels/{name}", response_class=HTMLResponse)
+async def load_channels(request: Request, name: str):
+    if name not in _RADIO_FIELDS:
+        return PlainTextResponse("unknown radio", status_code=404)
+    conn_f, port_f, host_f, _, _ = _RADIO_FIELDS[name]
+    form = await request.form()
+    conn = form.get(conn_f, "serial")
+    port = form.get(port_f, "")
+    host = form.get(host_f, "")
+    db, tx = _db(request), _tx(request)
+    channels, model, error = await tx.load_channels(name, conn, port, host)
+    if channels is not None:  # success: cache names + model so they persist across reload/save
+        db.set_setting(name + "_channels", channels)
+        db.set_setting(name + "_model", model)
+        ctx = _channel_ctx(db, tx, name, channels=channels, model=model,
+                           error="", connected=True)
+    else:  # failed read of THIS device: show the error + saved values, never a stale
+        # cached list from a different radio, and don't claim connected.
+        ctx = _channel_ctx(db, tx, name, channels=[], model="",
+                           error=error or "could not read this radio", connected=False)
+    return render(request, "_radio_channels.html", **ctx)
 
 
 # ---- manual send -------------------------------------------------------

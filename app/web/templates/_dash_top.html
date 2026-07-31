@@ -2,7 +2,8 @@
   <div class="topbar">
     <div>
       <h2 class="pt">Dashboard</h2>
-      <p class="sub">NWS &rarr; Meshtastic &middot; Broader Midlands SC</p>
+      {% set rnames = transports | selectattr('enabled') | map(attribute='label') | list %}
+      <p class="sub">NWS &rarr; {{ rnames | join(' + ') if rnames else 'no radios' }} &middot; Broader Midlands SC</p>
     </div>
     <div class="topbar-right">
       <span class="live-pill{{ ' paused' if dry_run else '' }}"><span class="dot"></span>{{ "PAUSED" if dry_run else "Broadcasting LIVE" }}</span>
@@ -47,8 +48,11 @@
       <div class="big">{{ poll_interval }}<span class="unit">s</span></div><div class="s2">every cycle, automatic</div></div>
     <div class="dstat"><div class="top"><svg viewBox="0 0 24 24"><path d="M4 8a12 12 0 0116 0"/><path d="M7 12a7 7 0 0110 0"/><circle cx="12" cy="16" r="1.6" fill="currentColor" stroke="none"/></svg><span class="t">Broadcast &middot; 7d</span></div>
       <div class="big">{{ sent_7d }}</div><div class="s2">{{ sent_today }} today</div></div>
-    <div class="dstat"><div class="top"><svg viewBox="0 0 24 24"><path d="M4 8a12 12 0 0116 0"/><path d="M7 12a7 7 0 0110 0"/></svg><span class="t">Node</span></div>
-      <div class="big" style="font-size:18px;color:{{ 'var(--good)' if connected else 'var(--bad)' }};">{{ "Connected" if connected else "Offline" }}</div>
-      <div class="s2">{{ device }} &middot; ch {{ channel_index }}</div></div>
+    <div class="dstat"><div class="top"><svg viewBox="0 0 24 24"><path d="M4 8a12 12 0 0116 0"/><path d="M7 12a7 7 0 0110 0"/></svg><span class="t">Radios online</span></div>
+      {% set active = transports | selectattr('enabled') | list %}
+      {% set nconn = active | selectattr('connected') | list | length %}
+      {% set nen = active | length %}
+      <div class="big" style="color:{{ 'var(--good)' if nen and nconn == nen else ('var(--bad)' if nen else 'var(--muted)') }};">{{ nconn }}<span class="unit"> / {{ nen }}</span></div>
+      <div class="s2">{% if not nen %}none enabled{% elif nconn == nen %}all online{% else %}{{ nen - nconn }} offline{% endif %}</div></div>
   </section>
 </div>

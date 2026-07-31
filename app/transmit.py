@@ -32,6 +32,10 @@ class Transmitter(abc.ABC):
     @abc.abstractmethod
     def connected(self) -> bool: ...
 
+    async def read_channels(self) -> list:
+        """Return the channels configured on the device: [{index, name}]. Optional."""
+        return []
+
 
 class MeshtasticTransmitter(Transmitter):
     label = "Meshtastic"
@@ -47,7 +51,10 @@ class MeshtasticTransmitter(Transmitter):
         def _open():
             if self.conn == "tcp":
                 from meshtastic.tcp_interface import TCPInterface
-                return TCPInterface(hostname=self.host)
+                h, _, p = (self.host or "").partition(":")
+                if p:  # explicit host:port
+                    return TCPInterface(hostname=h, portNumber=int(p))
+                return TCPInterface(hostname=h)
             from meshtastic.serial_interface import SerialInterface
             return SerialInterface(devPath=self.port)
 
@@ -70,6 +77,51 @@ class MeshtasticTransmitter(Transmitter):
     @property
     def connected(self) -> bool:
         return self._iface is not None
+
+    async def read_channels(self) -> list:
+        if self._iface is None:
+            raise RuntimeError("not connected")
+
+        def _read():
+            out = []
+            node = getattr(self._iface, "localNode", None)
+            for ch in (getattr(node, "channels", None) or []):
+                role = int(getattr(ch, "role", 0))  # 0 DISABLED, 1 PRIMARY, 2 SECONDARY
+                if role == 0:
+                    continue
+                name = ""
+                if getattr(ch, "settings", None) is not None:
+                    name = ch.settings.name or ""
+                if not name:
+                    name = "LongFast" if role == 1 else ("channel %d" % ch.index)
+                out.append({"index": int(ch.index), "name": name})
+            return out
+
+        return await asyncio.get_event_loop().run_in_executor(None, _read)
+
+    async def read_info(self) -> dict:
+        if self._iface is None:
+            return {}
+
+        def _read():
+            info = {}
+            try:
+                ni = self._iface.getMyNodeInfo() or {}
+                hw = (ni.get("user") or {}).get("hwModel")
+                if hw:
+                    info["model"] = str(hw)
+            except Exception:
+                pass
+            try:
+                meta = getattr(self._iface, "metadata", None)
+                fw = getattr(meta, "firmware_version", "") if meta is not None else ""
+                if fw:
+                    info["firmware"] = str(fw)
+            except Exception:
+                pass
+            return info
+
+        return await asyncio.get_event_loop().run_in_executor(None, _read)
 
 
 class MeshCoreTransmitter(Transmitter):
@@ -128,6 +180,45 @@ class MeshCoreTransmitter(Transmitter):
     def connected(self) -> bool:
         return self._mc is not None
 
+    async def read_channels(self) -> list:
+        if self._mc is None:
+            raise RuntimeError("not connected")
+        from meshcore import EventType
+        out = []
+        for idx in range(0, 8):
+            res = await self._mc.commands.get_channel(idx)
+            if getattr(res, "type", None) != EventType.CHANNEL_INFO:
+                break  # device ran out of channel slots
+            p = getattr(res, "payload", {}) or {}
+            name = (p.get("channel_name") or "").strip()
+            if not name:
+                continue  # empty/unconfigured slot
+            out.append({"index": int(p.get("channel_idx", idx)), "name": name})
+        return out
+
+    async def read_info(self) -> dict:
+        if self._mc is None:
+            return {}
+        from meshcore import EventType
+        try:
+            res = await self._mc.commands.send_device_query()
+        except Exception:
+            return {}
+        if getattr(res, "type", None) != EventType.DEVICE_INFO:
+            return {}
+        p = getattr(res, "payload", {}) or {}
+        return {"model": (p.get("model") or "").strip(),
+                "firmware": (p.get("ver") or "").strip()}
+
+
+def _fmt_model(info: dict) -> str:
+    """Human label for a radio from its info dict, e.g. 'Heltec V3 (fw 2.5.9)'."""
+    model = (info.get("model") or "").replace("_", " ").strip()
+    fw = (info.get("firmware") or "").strip()
+    if model and fw:
+        return "%s (fw %s)" % (model, fw)
+    return model or (("fw %s" % fw) if fw else "")
+
 
 @dataclass
 class Transport:
@@ -139,6 +230,7 @@ class Transport:
     target: str                   # serial path or host - display + "configured?" check
     make: object                  # callable() -> Transmitter
     repeat: int = 1               # send each alert this many times (LoRa has no ACK)
+    test_channel: int = 1         # channel used for tests + manual sends
     tx: Transmitter | None = None
     connected: bool = False
     error: str = ""
@@ -153,29 +245,32 @@ def _build_transports(db) -> dict:
     def g(k, d=None):
         return db.get_setting(k, d)
 
-    def rep(k):
+    def num(k, d=0):
         try:
-            return max(1, min(5, int(g(k, 2) or 2)))
+            return int(g(k, d) or d)
         except (TypeError, ValueError):
-            return 2
+            return d
+
+    def rep(k):
+        return max(1, min(5, num(k, 2)))
 
     mt_conn = g("meshtastic_conn", "serial") or "serial"
     mt = Transport(
         name="meshtastic", label="Meshtastic",
         enabled=bool(g("meshtastic_enabled", True)),
-        conn=mt_conn, channel=int(g("channel_index", 0) or 0),
+        conn=mt_conn, channel=num("channel_index", 0),
         target=(g("meshtastic_host", "") if mt_conn == "tcp" else g("serial_port", "")) or "",
         make=lambda: MeshtasticTransmitter(mt_conn, g("serial_port", "") or "", g("meshtastic_host", "") or ""),
-        repeat=rep("meshtastic_repeat"),
+        repeat=rep("meshtastic_repeat"), test_channel=num("meshtastic_test_channel", 1),
     )
     mc_conn = g("meshcore_conn", "serial") or "serial"
     mc = Transport(
         name="meshcore", label="MeshCore",
         enabled=bool(g("meshcore_enabled", False)),
-        conn=mc_conn, channel=int(g("meshcore_channel", 0) or 0),
+        conn=mc_conn, channel=num("meshcore_channel", 0),
         target=(g("meshcore_host", "") if mc_conn == "tcp" else g("meshcore_port", "")) or "",
         make=lambda: MeshCoreTransmitter(mc_conn, g("meshcore_port", "") or "", g("meshcore_host", "") or ""),
-        repeat=rep("meshcore_repeat"),
+        repeat=rep("meshcore_repeat"), test_channel=num("meshcore_test_channel", 1),
     )
     return {"meshtastic": mt, "meshcore": mc}
 
@@ -295,98 +390,115 @@ class TransmitManager:
             self._db.add_event("WARN", "transmit queue full; dropped oldest message")
         return not dropped
 
+    async def _try_send(self, t: Transport, text: str, ch: int) -> tuple[bool, str]:
+        """Send once; if the link is dead (e.g. an idle TCP socket giving a
+        Broken pipe), reconnect and retry once. Returns (ok, error)."""
+        last = "not connected"
+        for attempt in (1, 2):
+            if t.tx is None or not t.connected:
+                if not await self._ensure(t):
+                    last = t.error or "not connected"
+                    continue
+            try:
+                await t.tx.send_text(text, ch)
+                if attempt > 1:
+                    self._db.add_event("INFO", "%s recovered a dropped link and sent" % t.label)
+                return True, ""
+            except Exception as exc:
+                last = "send failed: %s" % exc
+                t.error, t.connected = last, False
+                try:
+                    await t.tx.close()
+                except Exception:
+                    pass
+                t.tx = None
+                logger.warning("%s send failed (attempt %d/2): %s", t.name, attempt, exc)
+        self._db.add_error(t.name, last)   # only a real error if the retry also failed
+        return False, last
+
     async def _send_all(self, text: str, manual: bool) -> bool:
         any_ok = False
         blen = len(text.encode())
         async with self._lock:
-            # Automated alerts go on the radio's alert channel; a manual send
-            # (test button / manual page) goes on the test channel so it never
-            # clutters the live alert channel.
-            test_ch = self._test_channel()
+            # Automated alerts go on each radio's live channel; a manual send
+            # goes on that radio's test channel. LoRa broadcasts are unacked, so
+            # send t.repeat times; each send reconnects+retries once on a dead link.
             for t in self._transports.values():
                 if not t.enabled:
                     continue
-                ch = test_ch if manual else t.channel
-                if not await self._ensure(t):
-                    self._db.add_transmit_log(ch, blen, False, text, manual,
-                                              error=t.error, transport=t.name)
-                    continue
-                # LoRa channel broadcasts are unacknowledged, so send each alert
-                # t.repeat times (spaced out) to survive a dropped packet.
-                sends = max(1, t.repeat)
-                broke = False
-                for i in range(sends):
+                ch = t.test_channel if manual else t.channel
+                for i in range(max(1, t.repeat)):
                     if i > 0:
                         await asyncio.sleep(REPEAT_GAP_SECONDS)
-                    try:
-                        await t.tx.send_text(text, ch)
-                        self._db.add_transmit_log(ch, blen, True, text, manual,
-                                                  transport=t.name)
+                    ok, err = await self._try_send(t, text, ch)
+                    self._db.add_transmit_log(ch, blen, ok, text, manual,
+                                              error=("" if ok else err), transport=t.name)
+                    if ok:
                         any_ok = True
-                        logger.info("transmitted via %s (%d/%d)", t.name, i + 1, sends,
-                                    extra={"channel": ch, "bytes": blen,
-                                           "action": "manual" if manual else "auto"})
-                    except Exception as exc:
-                        t.error = "send failed: %s" % exc
-                        t.connected = False
-                        try:
-                            await t.tx.close()
-                        except Exception:
-                            pass
-                        t.tx = None
-                        self._db.add_transmit_log(ch, blen, False, text, manual,
-                                                  error=str(exc), transport=t.name)
-                        self._db.add_error(t.name, t.error)
-                        logger.warning("%s send failed: %s", t.name, exc)
-                        broke = True
-                        break
-                if broke:
-                    continue
+                        logger.info("transmitted via %s (%d/%d) ch %d",
+                                    t.name, i + 1, max(1, t.repeat), ch)
+                    else:
+                        break  # failed even after a reconnect; stop repeating this radio
         return any_ok
 
     async def send_manual(self, text: str, channel: int | None = None) -> bool:
         return await self._send_all(text, manual=True)
 
-    def _test_channel(self) -> int:
-        """Channel used for tests + manual sends (kept off the live alert channel)."""
-        try:
-            return int(self._db.get_setting("test_channel", 1) or 1)
-        except (TypeError, ValueError):
-            return 1
+    async def load_channels(self, name: str, conn: str, port: str, host: str):
+        """Open a transient connection with the given params; read the device's
+        channels and model. Returns (channels|None, model_str, error). Frees the
+        live port first so it never double-opens, then restores the live link."""
+        async with self._lock:
+            t = self._transports.get(name)
+            if t is None:
+                return None, "", "unknown radio"
+            if t.tx is not None:            # release the live connection first
+                try:
+                    await t.tx.close()
+                except Exception:
+                    pass
+                t.tx, t.connected = None, False
+            maker = MeshtasticTransmitter if name == "meshtastic" else MeshCoreTransmitter
+            tx = maker(conn or "serial", port or "", host or "")
+            try:
+                await tx.connect()
+                channels = await tx.read_channels()
+                model = ""
+                try:
+                    model = _fmt_model(await tx.read_info())
+                except Exception:
+                    pass
+                result = (channels, model, "")
+            except Exception as exc:
+                result = (None, "", str(exc))
+            finally:
+                try:
+                    await tx.close()
+                except Exception:
+                    pass
+            # best-effort: bring the live link back so "Connect" doesn't leave it offline
+            try:
+                await self._ensure(t)
+            except Exception:
+                pass
+            return result
 
     async def send_to(self, name: str, text: str) -> tuple[bool, str]:
         """Key up a single named radio (bench testing). Returns (ok, error)."""
         blen = len(text.encode())
-        ch = self._test_channel()   # tests go on the test channel, not the alert channel
         async with self._lock:
             t = self._transports.get(name)
             if t is None:
                 return False, "unknown radio"
             if not t.enabled:
                 return False, "%s is disabled" % t.label
-            if not await self._ensure(t):
-                self._db.add_transmit_log(ch, blen, False, text, True,
-                                          error=t.error, transport=t.name)
-                return False, t.error or "not connected"
-            try:
-                await t.tx.send_text(text, ch)
-                self._db.add_transmit_log(ch, blen, True, text, True,
-                                          transport=t.name)
+            ch = t.test_channel   # tests go on this radio's test channel
+            ok, err = await self._try_send(t, text, ch)
+            self._db.add_transmit_log(ch, blen, ok, text, True,
+                                      error=("" if ok else err), transport=t.name)
+            if ok:
                 logger.info("test transmitted via %s on ch %d", t.name, ch)
-                return True, ""
-            except Exception as exc:
-                t.error = "send failed: %s" % exc
-                t.connected = False
-                try:
-                    await t.tx.close()
-                except Exception:
-                    pass
-                t.tx = None
-                self._db.add_transmit_log(ch, blen, False, text, True,
-                                          error=str(exc), transport=t.name)
-                self._db.add_error(t.name, t.error)
-                logger.warning("%s test send failed: %s", t.name, exc)
-                return False, str(exc)
+            return ok, ("" if ok else err)
 
     async def _worker(self) -> None:
         first = True
