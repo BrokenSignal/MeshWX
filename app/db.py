@@ -88,6 +88,9 @@ class Database:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
+        # A write that hits a lock should WAIT (up to 5s) for it to clear rather
+        # than fail instantly with "database is locked".
+        self._conn.execute("PRAGMA busy_timeout=5000")
         self._lock = threading.Lock()
         self._init_schema()
         self._seed_settings()
@@ -284,6 +287,12 @@ class Database:
             return self._conn.execute(
                 "SELECT * FROM transmit_log ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
+
+    def get_transmit_log(self, entry_id: int):
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM transmit_log WHERE id = ?", (entry_id,)
+            ).fetchone()
 
     # ---- errors ---------------------------------------------------------
     def add_error(self, source: str, message: str) -> None:

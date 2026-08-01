@@ -112,3 +112,59 @@ async def test_active_alert_logged_once_across_polls(wired):
     filtered = [r for r in db.query_history(limit=500) if r["disposition"] == "filtered"]
     assert len(filtered) == 1
     assert filtered[0]["detail"]  # reason recorded
+
+
+class ResultTx:
+    """Simulates a broadcast whose real outcome (verified sent / failed on all
+    radios) is reported back through on_result -- the feedback the poller needs
+    so it does not mark a failed alert as delivered."""
+    def __init__(self, ok):
+        self.ok = ok
+        self.calls = []
+
+    def enqueue(self, text, channel, on_result=None):
+        self.calls.append(text)
+        if on_result is not None:
+            on_result(self.ok)
+        return True
+
+
+async def test_failed_broadcast_retries_and_alarms(monkeypatch, feature):
+    """A warning that fails on every radio must NOT be deduped (so it retries)
+    and must raise an alarm -- never silently marked delivered."""
+    import app.poller as poller_mod
+    monkeypatch.setattr(poller_mod, "NWSClient", FakeNWS)
+    db = Database(":memory:")
+    db.set_setting("dry_run", False)
+    tx = ResultTx(ok=False)
+    poller = WxPoller(db, tx)
+    ffw = feature("flash_flood_warning")
+
+    FakeNWS.queue = [_collection([ffw])]
+    await poller.poll_once()
+    assert len(tx.calls) == 1                      # it went to the radios
+    assert poller.status.last_broadcast_failure is not None  # alarm state set
+    levels = [e["level"] for e in db.recent_events(50)]
+    assert "ALARM" in levels                       # loud, visible alarm raised
+
+    FakeNWS.queue = [_collection([ffw])]
+    await poller.poll_once()
+    assert len(tx.calls) == 2, "a failed alert must be retried, not deduped away"
+
+
+async def test_successful_broadcast_is_deduped(monkeypatch, feature):
+    """A verified send is recorded so the same alert is not rebroadcast every poll."""
+    import app.poller as poller_mod
+    monkeypatch.setattr(poller_mod, "NWSClient", FakeNWS)
+    db = Database(":memory:")
+    db.set_setting("dry_run", False)
+    tx = ResultTx(ok=True)
+    poller = WxPoller(db, tx)
+    ffw = feature("flash_flood_warning")
+
+    FakeNWS.queue = [_collection([ffw])]
+    await poller.poll_once()
+    FakeNWS.queue = [_collection([ffw])]
+    await poller.poll_once()
+    assert len(tx.calls) == 1, "a verified send must be deduped, not resent every poll"
+    assert poller.status.last_broadcast_failure is None

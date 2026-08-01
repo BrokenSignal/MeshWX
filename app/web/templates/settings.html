@@ -71,8 +71,6 @@
             <option value="serial" {% if mt_conn=='serial' %}selected{% endif %}>USB (serial)</option>
             <option value="tcp" {% if mt_conn=='tcp' %}selected{% endif %}>Network (IP / TCP)</option>
           </select></div>
-        <div><label>Repeat each alert (1-5)</label>
-          <input name="meshtastic_repeat" type="number" min="1" max="5" value="{{ mt_repeat }}"></div>
       </div>
 
       <div id="mt-usb" style="display:{{ 'none' if mt_conn=='tcp' else 'block' }}">
@@ -101,8 +99,6 @@
             <option value="serial" {% if mc_conn=='serial' %}selected{% endif %}>USB (serial)</option>
             <option value="tcp" {% if mc_conn=='tcp' %}selected{% endif %}>Network (IP / TCP)</option>
           </select></div>
-        <div><label>Repeat each alert (1-5)</label>
-          <input name="meshcore_repeat" type="number" min="1" max="5" value="{{ mc_repeat }}"></div>
       </div>
 
       <div id="mc-usb" style="display:{{ 'none' if mc_conn=='tcp' else 'block' }}">

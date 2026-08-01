@@ -161,11 +161,13 @@ MeshWX keeps testing off the air people are actually watching:
 Both are set in **Settings** (per-radio alert channel, plus a per-radio **Test channel**).
 Point your listening node at channel 0 for real alerts, or channel 1 to watch tests.
 
-### Repeat sends
+### Verified sends
 
-LoRa channel broadcasts have no acknowledgement, so a single packet can be dropped. Each
-radio can send every alert more than once (**Repeat each alert**, default 2), spaced a few
-seconds apart, so one lost packet doesn't mean a missed warning. Set per radio in Settings.
+LoRa channel broadcasts are unacknowledged, so a radio can report success without actually
+transmitting. MeshWX confirms each send against the radio's own transmit counter: a message
+is logged **sent** only when the radio really keyed up. A send that does not go out is
+retried and then logged **failed**, so a miss shows in the transmit log rather than being
+silently lost.
 
 ## Configuration
 

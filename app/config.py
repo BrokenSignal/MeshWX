@@ -93,6 +93,10 @@ DEFAULT_SETTINGS: dict = {
 }
 
 POLL_INTERVAL_MIN = 60
+# Hard ceiling on a single poll cycle. The NWS fetch is already bounded (30s
+# timeout x a few retries), so exceeding this means something hung (DB lock,
+# wedged await, a bug). The watchdog aborts the poll so the loop always recovers.
+POLL_HARD_TIMEOUT = 180
 MAX_PAYLOAD_BYTES = 195
 BURST_GAP_SECONDS = 30
 REPEAT_GAP_SECONDS = 5   # gap between repeated copies of the same alert

@@ -11,10 +11,28 @@ from __future__ import annotations
 import abc
 import asyncio
 import logging
+import time
 from collections import deque
 from dataclasses import dataclass
 
-from .config import BURST_GAP_SECONDS, REPEAT_GAP_SECONDS, QUEUE_MAX
+from .config import BURST_GAP_SECONDS, REPEAT_GAP_SECONDS, QUEUE_MAX, MAX_PAYLOAD_BYTES
+
+
+class TxUnsent(Exception):
+    """Raised when a radio did not actually transmit a message. `category` tells
+    the sender WHY, so it can apply the right correction instead of blindly
+    retrying:
+      'duty_cycle' - radio hit its airtime/duty-cycle cap: wait, then retry
+      'queue_full' - the radio's TX queue is full: wait for it to drain, retry
+      'too_large'  - message exceeds the radio payload: shrink it (unrecoverable here)
+      'no_channel' - the configured channel index does not exist: config error
+      'link'       - radio interface down / no response: reconnect, then retry
+      'unsent'     - radio accepted the command but did not key up: wait/reconnect
+    """
+    def __init__(self, category: str, detail: str):
+        super().__init__(detail)
+        self.category = category
+        self.detail = detail
 
 logger = logging.getLogger("mesh_wx.tx")
 
@@ -43,6 +61,7 @@ class MeshtasticTransmitter(Transmitter):
     def __init__(self, conn: str, port: str = "", host: str = ""):
         self.conn, self.port, self.host = conn, port, host
         self._iface = None
+        self._qstatus = {}   # firmware TX-queue verdict per packet id: {id: res}
 
     async def connect(self) -> None:
         if self._iface is not None:
@@ -53,18 +72,64 @@ class MeshtasticTransmitter(Transmitter):
                 from meshtastic.tcp_interface import TCPInterface
                 h, _, p = (self.host or "").partition(":")
                 if p:  # explicit host:port
-                    return TCPInterface(hostname=h, portNumber=int(p))
-                return TCPInterface(hostname=h)
-            from meshtastic.serial_interface import SerialInterface
-            return SerialInterface(devPath=self.port)
+                    iface = TCPInterface(hostname=h, portNumber=int(p))
+                else:
+                    iface = TCPInterface(hostname=h)
+            else:
+                from meshtastic.serial_interface import SerialInterface
+                iface = SerialInterface(devPath=self.port)
+            # Hook the firmware's per-packet TX-queue status so each send can be
+            # verified: the radio replies with a QueueStatus for the packet id,
+            # res==0 means it was accepted into the TX queue (will transmit),
+            # res!=0 means it was rejected/dropped (the silent-drop failure).
+            self._qstatus = {}
+            orig = iface._handleQueueStatusFromRadio
+            def _hook(qs):
+                try:
+                    if len(self._qstatus) > 256:
+                        self._qstatus.clear()
+                    self._qstatus[qs.mesh_packet_id] = (qs.res, qs.free)
+                except Exception:
+                    pass
+                return orig(qs)
+            iface._handleQueueStatusFromRadio = _hook
+            return iface
 
         self._iface = await asyncio.get_event_loop().run_in_executor(None, _open)
 
     async def send_text(self, text: str, channel: int) -> None:
         if self._iface is None:
             raise RuntimeError("not connected")
-        await asyncio.get_event_loop().run_in_executor(
-            None, lambda: self._iface.sendText(text, channelIndex=channel))
+
+        # res -> (category, name). The radio tells us WHY a packet was not queued.
+        cat_by_res = {4: "link", 6: "no_channel", 7: "too_large", 8: "link",
+                      9: "duty_cycle"}
+
+        def _send_and_verify():
+            pkt = self._iface.sendText(text, channelIndex=channel)
+            pid = getattr(pkt, "id", None)
+            if pid is None:
+                return  # no id to track: fall back to best-effort
+            waited = 0.0
+            while waited < 6.0:               # await the firmware's verdict
+                if pid in self._qstatus:
+                    res, free = self._qstatus.pop(pid)
+                    if res == 0:
+                        return                # accepted into TX queue -> transmits
+                    from meshtastic import mesh_pb2
+                    try:
+                        name = mesh_pb2.Routing.Error.Name(res)
+                    except Exception:
+                        name = "res=%s" % res
+                    cat = cat_by_res.get(res, "unsent")
+                    if free == 0 and cat == "unsent":
+                        cat = "queue_full"
+                    raise TxUnsent(cat, "radio did not transmit (%s)" % name)
+                time.sleep(0.15)
+                waited += 0.15
+            raise TxUnsent("link", "radio did not transmit (no queue confirmation)")
+
+        await asyncio.get_event_loop().run_in_executor(None, _send_and_verify)
 
     async def close(self) -> None:
         if self._iface is not None:
@@ -152,21 +217,38 @@ class MeshCoreTransmitter(Transmitter):
     async def send_text(self, text: str, channel: int) -> None:
         if self._mc is None:
             raise RuntimeError("not connected")
+        # The device's OK/timeout is NOT proof of RF -- a channel broadcast has no
+        # ACK, so an "OK" only means the command was accepted, not that the radio
+        # keyed up. Confirm the actual transmission by watching the radio's own
+        # flood-TX counter advance (proven: it ticks by 1 per real send, and stays
+        # flat when the radio does not transmit).
         from meshcore import EventType
+        before = await self._flood_tx()
         res = await self._mc.commands.send_chan_msg(channel, text)
+        # Capture the device's own error reason, if it gave one, for diagnostics.
+        reason = ""
         if getattr(res, "type", None) == EventType.ERROR:
             payload = getattr(res, "payload", {}) or {}
-            reason = payload.get("reason") if isinstance(payload, dict) else None
-            # A missing confirmation frame is NOT a delivery failure: a channel
-            # broadcast has no ACK, and the device likely still transmitted it
-            # (the meshcore lib says as much). Treat as best-effort success and
-            # KEEP the link up - otherwise every unconfirmed send tears the radio
-            # down and it flaps offline.
-            if reason in ("no_event_received", "timeout"):
-                logger.warning(
-                    "meshcore: channel send unconfirmed (%s); treating as sent", reason)
-                return
-            raise RuntimeError("meshcore error: %s" % payload)
+            reason = payload.get("reason", "") if isinstance(payload, dict) else ""
+        if before is None:
+            return  # counter unreadable: fall back to best-effort (never block sends)
+        for _ in range(15):                       # poll up to ~4.5s
+            await asyncio.sleep(0.3)
+            after = await self._flood_tx()
+            if after is not None and after > before:
+                return                            # verified on the air (flood_tx advanced)
+        detail = "radio did not transmit (TX counter did not advance%s)" % (
+            "; %s" % reason if reason else "")
+        raise TxUnsent("unsent", detail)
+
+    async def _flood_tx(self):
+        try:
+            res = await self._mc.commands.get_stats_packets()
+            p = getattr(res, "payload", {}) or {}
+            v = p.get("flood_tx")
+            return int(v) if v is not None else None
+        except Exception:
+            return None
 
     async def close(self) -> None:
         if self._mc is not None:
@@ -239,6 +321,7 @@ class Transport:
 @dataclass
 class QueueItem:
     text: str
+    on_result: object = None   # optional callable(ok: bool) invoked after the send
 
 
 def _build_transports(db) -> dict:
@@ -363,85 +446,168 @@ class TransmitManager:
         if not t.target:
             t.error = "no connection configured"
             return False
-        try:
-            tx = t.make()
-            await tx.connect()
-            t.tx, t.connected, t.error = tx, True, ""
+        err = await self._open_once(t)
+        if not err:
             self._reconnect_delay = 2.0
             self._db.add_event("INFO", "%s connected (%s)" % (t.label, t.target))
             logger.info("%s connected at %s", t.name, t.target)
             return True
+        t.error = err
+        self._db.add_error(t.name, err)
+        logger.warning("%s connect failed: %s", t.name, err)
+        return False
+
+    async def _open_once(self, t: Transport) -> str:
+        """Open t's link once. Returns '' on success or an error string. No DB
+        logging so callers (startup vs. reconnect) can decide how to report."""
+        try:
+            tx = t.make()
+            await tx.connect()
+            t.tx, t.connected, t.error = tx, True, ""
+            return ""
         except Exception as exc:
             t.tx, t.connected = None, False
-            t.error = "connect failed: %s" % exc
-            self._db.add_error(t.name, t.error)
-            logger.warning("%s connect failed: %s", t.name, exc)
-            return False
+            return "connect failed: %s" % exc
+
+    @staticmethod
+    def _is_port_locked(err: str) -> bool:
+        e = err.lower()
+        return ("lock" in e or "busy" in e or "errno 11" in e
+                or "errno 16" in e or "resource temporarily unavailable" in e)
 
     # ---- sending --------------------------------------------------------
-    def enqueue(self, text: str, channel: int | None = None) -> bool:
+    def enqueue(self, text: str, channel: int | None = None, on_result=None) -> bool:
         """Queue an automated transmission (fanned out to all enabled transports).
-        The channel arg is ignored - each transport uses its own configured channel."""
+        The channel arg is ignored - each transport uses its own configured channel.
+        on_result(ok) is invoked after the send so the caller learns the REAL
+        outcome (verified sent on a radio, or failed on all) instead of assuming
+        a queued message was delivered."""
         dropped = len(self._queue) == self._queue.maxlen
-        self._queue.append(QueueItem(text=text))
+        if dropped and on_result is not None:
+            # The alert we are about to drop never gets a send: report it failed so
+            # the caller does not record it as delivered.
+            oldest = self._queue[0] if self._queue else None
+            if oldest is not None and oldest.on_result is not None:
+                self._safe_result(oldest.on_result, False)
+        self._queue.append(QueueItem(text=text, on_result=on_result))
         self._queue_event.set()
         if dropped:
             logger.warning("transmit queue full; dropped oldest")
             self._db.add_event("WARN", "transmit queue full; dropped oldest message")
         return not dropped
 
+    def _safe_result(self, cb, ok: bool) -> None:
+        try:
+            r = cb(ok)
+            if asyncio.iscoroutine(r):
+                asyncio.create_task(r)
+        except Exception:
+            logger.exception("on_result callback error")
+
+    async def _reconnect(self, t: Transport) -> bool:
+        """Reset a transport's link, tolerating a zombie / locked serial port.
+        A just-closed port often has not released its fd yet, so an instant reopen
+        fails with '[Errno 11] could not exclusively lock port', and close() itself
+        can hang on a wedged reader thread. So: close firmly with a timeout, then
+        reopen with backoff, waiting out a still-locked port instead of giving up."""
+        t.connected = False
+        if t.tx is not None:
+            try:
+                await asyncio.wait_for(t.tx.close(), timeout=8)  # don't hang on a stuck close
+            except Exception:
+                pass
+        t.tx = None
+        last = "not reopened"
+        for i, delay in enumerate((0.5, 1.5, 3.0, 5.0)):
+            await asyncio.sleep(delay)          # give the OS time to release the port
+            err = await self._open_once(t)
+            if not err:
+                self._db.add_event(
+                    "INFO", "%s link reset%s (%s)" % (
+                        t.label, (" after %d tries" % (i + 1)) if i else "", t.target))
+                logger.info("%s reconnected at %s", t.name, t.target)
+                return True
+            last = err
+            if self._is_port_locked(err):
+                logger.warning("%s port still locked (try %d/4), waiting: %s",
+                               t.name, i + 1, err)
+            else:
+                logger.warning("%s reopen failed (try %d/4): %s", t.name, i + 1, err)
+        t.error = last
+        self._db.add_error(t.name, "link reset failed: %s" % last)
+        return False
+
     async def _try_send(self, t: Transport, text: str, ch: int) -> tuple[bool, str]:
-        """Send once; if the link is dead (e.g. an idle TCP socket giving a
-        Broken pipe), reconnect and retry once. Returns (ok, error)."""
+        """Send and confirm the radio actually transmitted. On failure, read WHY
+        (TxUnsent.category) and apply the matching correction before retrying:
+        wait out an airtime/queue limit, reconnect a dead link, or stop early on a
+        content/config error that a retry cannot fix. Returns (ok, error)."""
         last = "not connected"
-        for attempt in (1, 2):
+        for attempt in (1, 2, 3):
             if t.tx is None or not t.connected:
                 if not await self._ensure(t):
                     last = t.error or "not connected"
+                    await asyncio.sleep(1)
                     continue
             try:
                 await t.tx.send_text(text, ch)
                 if attempt > 1:
-                    self._db.add_event("INFO", "%s recovered a dropped link and sent" % t.label)
+                    self._db.add_event(
+                        "INFO", "%s sent on attempt %d (%s)" % (t.label, attempt, last))
                 return True, ""
+            except TxUnsent as exc:
+                last = exc.detail
+                t.error = last
+                cat = exc.category
+                logger.warning("%s not sent (attempt %d/3): %s [%s]",
+                               t.name, attempt, exc.detail, cat)
+                if cat in ("too_large", "no_channel"):
+                    break  # a retry cannot fix bad content/config; fail fast with the reason
+                if cat == "duty_cycle":
+                    await asyncio.sleep(6)          # airtime cap: let the radio cool down
+                elif cat == "queue_full":
+                    await asyncio.sleep(3)          # let the TX queue drain
+                elif cat == "link":
+                    await self._reconnect(t)        # interface down / no reply: reopen it
+                else:                               # "unsent": brief wait, then reconnect
+                    await asyncio.sleep(2)
+                    if attempt >= 2:
+                        await self._reconnect(t)
             except Exception as exc:
+                # Unexpected link error (Broken pipe, serial hiccup): reconnect + retry.
                 last = "send failed: %s" % exc
-                t.error, t.connected = last, False
-                try:
-                    await t.tx.close()
-                except Exception:
-                    pass
-                t.tx = None
-                logger.warning("%s send failed (attempt %d/2): %s", t.name, attempt, exc)
-        self._db.add_error(t.name, last)   # only a real error if the retry also failed
+                t.error = last
+                logger.warning("%s send error (attempt %d/3): %s", t.name, attempt, exc)
+                await self._reconnect(t)
+        self._db.add_error(t.name, last)   # a real failure only after all corrections tried
         return False, last
 
     async def _send_all(self, text: str, manual: bool, on_test: bool | None = None) -> bool:
         any_ok = False
+        # Validate before keying any radio: trim to the payload cap (multibyte-safe)
+        # so a too-long message never gets silently rejected by the firmware.
+        while len(text.encode()) > MAX_PAYLOAD_BYTES:
+            text = text[:-1]
         blen = len(text.encode())
         # `on_test` picks the channel (test vs live); `manual` only tags the log
         # (auto vs manual). Automated alerts AND composed manual sends both go on
         # each radio's LIVE channel; only the Troubleshoot test uses the test channel.
         use_test = manual if on_test is None else on_test
         async with self._lock:
-            # LoRa broadcasts are unacked, so send t.repeat times; each send
-            # reconnects+retries once on a dead link.
+            # Each enabled radio gets ONE send that is VERIFIED to have gone out
+            # (the send path retries internally on failure/no-transmit). No blind
+            # repeats: a message is logged "sent" only when the radio confirmed it
+            # actually keyed up, otherwise "failed" so the miss is visible.
             for t in self._transports.values():
                 if not t.enabled:
                     continue
                 ch = t.test_channel if use_test else t.channel
-                for i in range(max(1, t.repeat)):
-                    if i > 0:
-                        await asyncio.sleep(REPEAT_GAP_SECONDS)
-                    ok, err = await self._try_send(t, text, ch)
-                    self._db.add_transmit_log(ch, blen, ok, text, manual,
-                                              error=("" if ok else err), transport=t.name)
-                    if ok:
-                        any_ok = True
-                        logger.info("transmitted via %s (%d/%d) ch %d",
-                                    t.name, i + 1, max(1, t.repeat), ch)
-                    else:
-                        break  # failed even after a reconnect; stop repeating this radio
+                ok, err = await self._try_send(t, text, ch)
+                self._db.add_transmit_log(ch, blen, ok, text, manual,
+                                          error=("" if ok else err), transport=t.name)
+                if ok:
+                    any_ok = True
+                    logger.info("transmitted via %s on ch %d (verified)", t.name, ch)
         return any_ok
 
     async def send_manual(self, text: str) -> bool:
@@ -509,6 +675,23 @@ class TransmitManager:
                 logger.info("test transmitted via %s on ch %d", t.name, ch)
             return ok, ("" if ok else err)
 
+    async def resend(self, name: str, text: str, channel: int) -> tuple[bool, str]:
+        """Re-transmit an exact message on a specific radio and channel, logging a
+        fresh entry. Backs the transmit-log Resend button."""
+        blen = len(text.encode())
+        async with self._lock:
+            t = self._transports.get(name)
+            if t is None:
+                return False, "unknown radio"
+            if not t.enabled:
+                return False, "%s is disabled" % t.label
+            ok, err = await self._try_send(t, text, channel)
+            self._db.add_transmit_log(channel, blen, ok, text, True,
+                                      error=("" if ok else err), transport=t.name)
+            if ok:
+                logger.info("resent via %s on ch %d", t.name, channel)
+            return ok, ("" if ok else err)
+
     async def _worker(self) -> None:
         first = True
         while not self._stopped:
@@ -526,7 +709,17 @@ class TransmitManager:
                 except asyncio.CancelledError:
                     return
             item = self._queue.popleft()
-            ok = await self._send_all(item.text, manual=False)
+            try:
+                ok = await self._send_all(item.text, manual=False)
+                if item.on_result is not None:
+                    self._safe_result(item.on_result, ok)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # A failure here (e.g. a DB write erroring on a full disk) must not
+                # kill the worker -- that would silently stop ALL future broadcasts.
+                logger.exception("transmit worker iteration error")
+                ok = False
             first = False
             if not ok:
                 await asyncio.sleep(self._reconnect_delay)

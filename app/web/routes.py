@@ -124,7 +124,59 @@ def _dash_ctx(request) -> dict:
         # ASCII only: this string is auto-escaped through {{ }}, so a non-ASCII
         # separator could mojibake depending on charset. Keep it plain.
         last_tx = ("OK - " if ltx[0]["success"] else "failed - ") + fmt_local(ltx[0]["ts"], tz)
+
+    # ---- health watchdog: catch SILENT failures (looks live, delivers nothing) --
+    st = poller.status
+    interval = int(db.get_setting("poll_interval", 120))
+    dry = bool(db.get_setting("dry_run", True))
+    def _age_s(ts):
+        try:
+            return (now - datetime.datetime.fromisoformat(ts)).total_seconds()
+        except Exception:
+            return None
+    problems = []          # (level, message); level in {"critical","warn"}
+    # 1. Are we still reaching NWS? A stale success time = we are blind to alerts.
+    succ_age = _age_s(st.last_poll_success_time)
+    stale_after = max(interval * 3, 360)
+    if succ_age is None:
+        problems.append(("warn", "No successful NWS poll yet."))
+    elif succ_age > stale_after:
+        problems.append(("critical",
+            "Not reaching NWS: last good poll %d min ago. Not receiving alerts." % (succ_age // 60)))
+    if st.last_poll_result.startswith("error"):
+        problems.append(("warn", "Last NWS poll errored: %s" % st.last_poll_result[7:][:80]))
+    # 2. Radios: any enabled radio offline means alerts may not go out.
+    radios = tx.status()
+    on = [r for r in radios if r["enabled"]]
+    off = [r for r in on if not r["connected"]]
+    if on and len(off) == len(on):
+        problems.append(("critical", "All radios offline. Alerts cannot be broadcast."))
+    elif off:
+        problems.append(("warn", "%s offline." % ", ".join(r["label"] for r in off)))
+    if not on:
+        problems.append(("critical", "No radios enabled. Nothing will broadcast."))
+    # 3. A recent alert that failed on every radio (verified-transmit feedback).
+    bf_age = _age_s(st.last_broadcast_failure)
+    if bf_age is not None and bf_age < 1800:
+        problems.append(("critical",
+            "A broadcast FAILED %d min ago and is being retried: %s"
+            % (bf_age // 60, (st.last_broadcast_failure_text or "")[:60])))
+    # 4. Backed-up queue.
+    if tx.queue_depth > 5:
+        problems.append(("warn", "Transmit queue backed up (%d waiting)." % tx.queue_depth))
+    # 5. System clock skew vs NWS: makes alert "until" times wrong.
+    skew = getattr(st, "clock_skew_seconds", None)
+    if skew is not None and abs(skew) > 120:
+        problems.append(("warn",
+            "System clock is off by %d s vs NWS. Alert times may be wrong; check the VM clock."
+            % int(abs(skew))))
+    health_level = ("critical" if any(l == "critical" for l, _ in problems)
+                    else "warn" if problems else "ok")
+
     return {
+        "health_level": health_level,
+        "health_problems": [m for _, m in problems],
+        "health_paused": dry,
         "dry_run": bool(db.get_setting("dry_run", True)),
         "connected": tx.connected, "device": device, "tx_error": tx.last_error,
         "channel_index": int(db.get_setting("channel_index", 0)),
@@ -178,6 +230,15 @@ async def history(request: Request, disposition: str = "", date_from: str = "",
 async def transmit_log(request: Request):
     rows = _db(request).query_transmit_log()
     return render(request, "transmit_log.html", rows=rows)
+
+
+@router.post("/transmit-log/resend/{entry_id}", response_class=HTMLResponse)
+async def resend_log(request: Request, entry_id: int):
+    db, tx = _db(request), _tx(request)
+    row = db.get_transmit_log(entry_id)
+    if row is not None and row["transport"]:
+        await tx.resend(row["transport"], row["text"] or "", int(row["channel"]))
+    return render(request, "_transmit_rows.html", rows=db.query_transmit_log())
 
 
 
@@ -267,8 +328,6 @@ async def settings_page(request: Request):
         mc_port=s.get("meshcore_port", "") or "",
         mc_host=s.get("meshcore_host", "") or "",
         mc_channel=int(s.get("meshcore_channel", 0) or 0),
-        mt_repeat=int(s.get("meshtastic_repeat", 2) or 2),
-        mc_repeat=int(s.get("meshcore_repeat", 2) or 2),
         mt_test=int(s.get("meshtastic_test_channel", 1) or 1),
         mc_test=int(s.get("meshcore_test_channel", 1) or 1),
         mt_channels=s.get("meshtastic_channels", []) or [],
@@ -301,8 +360,6 @@ async def save_settings(
     meshcore_port: str = Form(""),
     meshcore_host: str = Form(""),
     meshcore_channel: int = Form(0),
-    meshtastic_repeat: int = Form(2),
-    meshcore_repeat: int = Form(2),
     meshtastic_test_channel: int = Form(1),
     meshcore_test_channel: int = Form(1),
 ):
@@ -335,8 +392,6 @@ async def save_settings(
     db.set_setting("meshcore_port", meshcore_port.strip())
     db.set_setting("meshcore_host", meshcore_host.strip())
     db.set_setting("meshcore_channel", int(meshcore_channel))
-    db.set_setting("meshtastic_repeat", _rep(meshtastic_repeat))
-    db.set_setting("meshcore_repeat", _rep(meshcore_repeat))
     db.set_setting("meshtastic_test_channel", int(meshtastic_test_channel))
     db.set_setting("meshcore_test_channel", int(meshcore_test_channel))
 

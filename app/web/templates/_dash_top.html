@@ -1,4 +1,14 @@
 <div id="dashtop" hx-get="/partials/status" hx-trigger="every 10s" hx-swap="outerHTML">
+  {% if health_problems %}
+  <div class="health-banner {{ health_level }}">
+    <div class="hb-title">
+      {% if health_level == 'critical' %}&#9888; Attention needed{% else %}Heads up{% endif %}
+    </div>
+    <ul class="hb-list">
+      {% for p in health_problems %}<li>{{ p }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
   <div class="topbar">
     <div>
       <h2 class="pt">Dashboard</h2>

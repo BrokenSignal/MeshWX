@@ -11,7 +11,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from .config import POLL_INTERVAL_MIN
+from .config import POLL_INTERVAL_MIN, POLL_HARD_TIMEOUT
 from .dedupe import decide
 from .filters import FilterRules
 from .formatter import build_mesh_text
@@ -24,8 +24,12 @@ logger = logging.getLogger("mesh_wx.poller")
 class PollerStatus:
     def __init__(self):
         self.last_poll_time: str | None = None
+        self.last_poll_success_time: str | None = None   # last poll that actually reached NWS
         self.last_poll_result: str = "not yet polled"
         self.last_raw_response: str = ""
+        self.last_broadcast_failure: str | None = None    # last alert that failed on all radios
+        self.last_broadcast_failure_text: str = ""
+        self.clock_skew_seconds: float | None = None      # system clock vs NWS server time
         self.started_at: datetime = datetime.now(timezone.utc)
 
     @property
@@ -65,7 +69,14 @@ class WxPoller:
     async def _run(self) -> None:
         while not self._stopped:
             try:
-                await self.poll_once()
+                # Hard watchdog: no single poll may hang the loop. If poll_once
+                # wedges (network black-hole, DB lock, a bug), abort it and let the
+                # next cycle run -- a stuck poller is a silent blind spot.
+                await asyncio.wait_for(self.poll_once(), timeout=POLL_HARD_TIMEOUT)
+            except asyncio.TimeoutError:
+                self.status.last_poll_result = "error: poll timed out (aborted by watchdog)"
+                self._db.add_error("poller", "poll hung and was aborted after %ds" % POLL_HARD_TIMEOUT)
+                logger.error("poll_once exceeded %ds; aborted by watchdog", POLL_HARD_TIMEOUT)
             except Exception as exc:  # never let the loop die
                 self.status.last_poll_result = f"error: {exc}"
                 self._db.add_error("poller", str(exc))
@@ -95,7 +106,19 @@ class WxPoller:
             return
 
         self.status.last_poll_time = now
+        self.status.last_poll_success_time = now
         self.status.last_raw_response = raw
+        # Clock-skew check: compare our clock to the NWS server's Date header. A
+        # skewed VM clock makes "until" times wrong and can break time-based dedup.
+        srv = getattr(client, "last_server_date", None)
+        if srv:
+            try:
+                from email.utils import parsedate_to_datetime
+                server_dt = parsedate_to_datetime(srv)
+                self.status.clock_skew_seconds = (
+                    datetime.now(timezone.utc) - server_dt).total_seconds()
+            except Exception:
+                pass
         features = data.get("features", []) or []
         self.status.last_poll_result = f"ok: {len(features)} active alert(s)"
 
@@ -150,10 +173,29 @@ class WxPoller:
         # Transmit path (history already recorded above).
         if dry_run:
             self._db.add_event("INFO", f"[DRY-RUN] would send: {text}")
+            self._record_state(alert, decision)   # unchanged: dedup while paused
         else:
-            self._tx.enqueue(text, channel)
+            # Record dedup state (so we don't repeat) ONLY when the broadcast is
+            # verified to have gone out. If it fails on every radio, we leave the
+            # state UNrecorded so the next poll retries this alert, and raise a
+            # loud alarm -- a warning that did not go out must not be forgotten.
+            fail_ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+            def _on_result(ok, a=alert, d=decision, t=text, ts=fail_ts):
+                if ok:
+                    self._record_state(a, d)
+                else:
+                    self.status.last_broadcast_failure = ts
+                    self.status.last_broadcast_failure_text = t
+                    self._db.add_error(
+                        "broadcast", f"NOT SENT on any radio (will retry): {t}")
+                    self._db.add_event(
+                        "ALARM", f"BROADCAST FAILED, will retry: {a.event} for "
+                                 f"{(a.area_desc or '')[:40]}")
+                    logger.error("broadcast FAILED on all radios: %s", t)
+
+            self._tx.enqueue(text, channel, on_result=_on_result)
             self._db.add_event("INFO", f"queued {decision.disposition}: {text}")
-        self._record_state(alert, decision)
         logger.info(
             "alert %s -> %s%s", alert.nws_id, decision.disposition,
             " (dry-run)" if dry_run else "",

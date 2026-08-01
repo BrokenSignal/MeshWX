@@ -26,6 +26,7 @@ class NWSClient:
     def __init__(self, contact: str, timeout: float = 30.0):
         self.contact = contact
         self.timeout = timeout
+        self.last_server_date: str | None = None   # NWS response Date header (clock-skew check)
 
     def _user_agent(self) -> str:
         # NWS asks for "app/version (contact)".
@@ -55,6 +56,7 @@ class NWSClient:
                     logger.warning("NWS request error (attempt %d): %s", attempt, exc)
                 else:
                     if resp.status_code == 200:
+                        self.last_server_date = resp.headers.get("date")
                         return resp.json(), resp.text
                     if resp.status_code == 429 or resp.status_code >= 500:
                         last_err = f"HTTP {resp.status_code}"
