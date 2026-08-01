@@ -145,6 +145,7 @@ this list grows as they are confirmed.
 | Heltec V3 | MeshCore | ✅ | ⬜ |
 | Thinknode M7 | Meshtastic | ✅ | ⚠️ |
 | RAK WisMesh Pocket V2 | Meshtastic | ✅ | ⬜ |
+| Seeed Studio T1000-E | Meshtastic | ✅ | ⬜ |
 
 Key: ✅ confirmed reliable, ⚠️ works but the link is unreliable, ⬜ not tested yet.
 
