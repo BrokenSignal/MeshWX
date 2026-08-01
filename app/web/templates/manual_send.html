@@ -3,16 +3,15 @@
 {% block content %}
 <h2>Manual Send</h2>
 <div class="panel">
-  <p class="hint">Manual messages <strong>always transmit</strong>, even when
+  <p class="hint">Manual messages <strong>always transmit</strong> on your
+    <strong>live channel</strong> (the same one real alerts use), even when
     broadcasting is paused. They are logged in the transmit log flagged as manual.</p>
   <form hx-post="/manual/send" hx-target="#result" hx-swap="innerHTML"
         onsubmit="return confirm('Transmit this message now?');">
     <label>Message (max {{ max_bytes }} bytes)</label>
-    <textarea id="msg" name="text" rows="3" maxlength="400"
-      oninput="updateCount()" required></textarea>
-    <div class="hint" style="margin-top:6px;">
-      <span id="count">0</span> / {{ max_bytes }} bytes
-      <span id="over" style="color:var(--bad);display:none;"> - over limit, will be truncated</span>
+    <div class="msgwrap">
+      <textarea id="msg" name="text" rows="3" oninput="updateCount()" required></textarea>
+      <span id="count" class="charcount">0/{{ max_bytes }}</span>
     </div>
     <div style="margin-top:12px;">
       <button type="submit">Send</button>
@@ -20,14 +19,28 @@
   </form>
   <div id="result" style="margin-top:14px;"></div>
 </div>
+<style>
+  .msgwrap{ position:relative; }
+  .msgwrap textarea{ width:100%; box-sizing:border-box; padding-bottom:26px; resize:vertical; }
+  .charcount{ position:absolute; right:12px; bottom:10px; font-size:12px; font-weight:700;
+    font-variant-numeric:tabular-nums; color:var(--good); pointer-events:none; }
+  .charcount.warn{ color:var(--warn); }
+  .charcount.full{ color:var(--bad); }
+</style>
 <script>
   const MAX = {{ max_bytes }};
   function byteLen(s){ return new TextEncoder().encode(s).length; }
   function updateCount(){
-    const t = document.getElementById('msg').value;
-    const n = byteLen(t);
-    document.getElementById('count').textContent = n;
-    document.getElementById('over').style.display = n > MAX ? 'inline' : 'none';
+    const ta = document.getElementById('msg');
+    let n = byteLen(ta.value);
+    // hard cap: trim to the byte limit as you type or paste
+    while(n > MAX){ ta.value = ta.value.slice(0, -1); n = byteLen(ta.value); }
+    const c = document.getElementById('count');
+    c.textContent = n + '/' + MAX;
+    c.classList.remove('warn', 'full');
+    if(n >= MAX) c.classList.add('full');
+    else if(n >= MAX - 10) c.classList.add('warn');
   }
+  document.addEventListener('DOMContentLoaded', updateCount);
 </script>
 {% endblock %}

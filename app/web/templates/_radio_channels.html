@@ -21,7 +21,7 @@
   </div>
 
   <div class="row">
-    <div><label>Live channel (real alerts)</label>
+    <div><label>Live channel (real alerts &amp; manual sends)</label>
       <select name="{{ live_field }}">
         {% if opts %}
           {% for c in opts %}<option value="{{ c.index }}" {% if c.index == live_val %}selected{% endif %}>{{ c.index }}: {{ c.name }}</option>{% endfor %}
@@ -29,7 +29,7 @@
           <option value="{{ live_val }}" selected>{{ live_val }} (load channels for names)</option>
         {% endif %}
       </select></div>
-    <div><label>Test channel (tests &amp; manual sends)</label>
+    <div><label>Test channel (troubleshoot tests)</label>
       <select name="{{ test_field }}">
         {% if opts %}
           {% for c in opts %}<option value="{{ c.index }}" {% if c.index == test_val %}selected{% endif %}>{{ c.index }}: {{ c.name }}</option>{% endfor %}

@@ -230,7 +230,7 @@ class Transport:
     target: str                   # serial path or host - display + "configured?" check
     make: object                  # callable() -> Transmitter
     repeat: int = 1               # send each alert this many times (LoRa has no ACK)
-    test_channel: int = 1         # channel used for tests + manual sends
+    test_channel: int = 1         # channel used for Troubleshoot tests only
     tx: Transmitter | None = None
     connected: bool = False
     error: str = ""
@@ -416,17 +416,20 @@ class TransmitManager:
         self._db.add_error(t.name, last)   # only a real error if the retry also failed
         return False, last
 
-    async def _send_all(self, text: str, manual: bool) -> bool:
+    async def _send_all(self, text: str, manual: bool, on_test: bool | None = None) -> bool:
         any_ok = False
         blen = len(text.encode())
+        # `on_test` picks the channel (test vs live); `manual` only tags the log
+        # (auto vs manual). Automated alerts AND composed manual sends both go on
+        # each radio's LIVE channel; only the Troubleshoot test uses the test channel.
+        use_test = manual if on_test is None else on_test
         async with self._lock:
-            # Automated alerts go on each radio's live channel; a manual send
-            # goes on that radio's test channel. LoRa broadcasts are unacked, so
-            # send t.repeat times; each send reconnects+retries once on a dead link.
+            # LoRa broadcasts are unacked, so send t.repeat times; each send
+            # reconnects+retries once on a dead link.
             for t in self._transports.values():
                 if not t.enabled:
                     continue
-                ch = t.test_channel if manual else t.channel
+                ch = t.test_channel if use_test else t.channel
                 for i in range(max(1, t.repeat)):
                     if i > 0:
                         await asyncio.sleep(REPEAT_GAP_SECONDS)
@@ -441,8 +444,14 @@ class TransmitManager:
                         break  # failed even after a reconnect; stop repeating this radio
         return any_ok
 
-    async def send_manual(self, text: str, channel: int | None = None) -> bool:
-        return await self._send_all(text, manual=True)
+    async def send_manual(self, text: str) -> bool:
+        # A composed manual broadcast is a real message for people, so it goes on
+        # each radio's LIVE channel (logged as a manual action).
+        return await self._send_all(text, manual=True, on_test=False)
+
+    async def send_test(self, text: str) -> bool:
+        # The Troubleshoot canned test goes on each radio's TEST channel.
+        return await self._send_all(text, manual=True, on_test=True)
 
     async def load_channels(self, name: str, conn: str, port: str, host: str):
         """Open a transient connection with the given params; read the device's

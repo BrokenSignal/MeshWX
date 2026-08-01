@@ -418,13 +418,12 @@ async def manual_page(request: Request):
 
 @router.post("/manual/send", response_class=HTMLResponse)
 async def manual_send(request: Request, text: str = Form(...)):
-    db, tx = _db(request), _tx(request)
+    tx = _tx(request)
     text = text[:MAX_PAYLOAD_BYTES] if len(text.encode()) > MAX_PAYLOAD_BYTES else text
     # Enforce byte cap defensively (multibyte-safe).
     while len(text.encode()) > MAX_PAYLOAD_BYTES:
         text = text[:-1]
-    channel = int(db.get_setting("channel_index", 0))
-    ok = await tx.send_manual(text, channel)
+    ok = await tx.send_manual(text)   # goes on each radio's LIVE channel
     msg = "sent" if ok else f"failed: {tx.last_error}"
     return render(request, "_manual_result.html", ok=ok, message=msg,
                   text=text, bytes=len(text.encode()))
@@ -448,7 +447,7 @@ async def clear_errors(request: Request):
 async def send_test(request: Request):
     tx = _tx(request)
     text = "[WX] mesh-wx test message"
-    ok = await tx.send_manual(text)
+    ok = await tx.send_test(text)   # goes on each radio's TEST channel
     return render(
         request, "_manual_result.html", ok=ok,
         message=("test sent to all radios" if ok else f"failed: {tx.last_error}"),
