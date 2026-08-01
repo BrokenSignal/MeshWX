@@ -133,10 +133,23 @@ No Python install required. Windows may warn about an unrecognized app the first
   board can renumber its port on replug; leave the port blank to auto-discover, or set it.
 - **MeshCore**: flash the board with the **USB (companion)** firmware, *not* repeater
   firmware. Repeater firmware exposes no serial API, so MeshWX can't drive it.
-- **Tested hardware.** MeshWX 1.0.0 is verified on the **Heltec V3** for both Meshtastic and
-  MeshCore: Meshtastic over USB and over the network (TCP/IP), MeshCore over USB. Other
-  Meshtastic and MeshCore boards are expected to work the same way; if you run one, please
-  open an [issue](../../issues) and say how it went.
+### Confirmed radios
+
+Hardware verified working with MeshWX, and over which connection. MeshWX speaks the standard
+Meshtastic and MeshCore protocols, so other boards on those firmwares are expected to work;
+this list grows as they are confirmed.
+
+| Radio | Protocol | USB | WiFi (TCP/IP) |
+|---|---|:---:|:---:|
+| Heltec V3 | Meshtastic | ✅ | ✅ |
+| Heltec V3 | MeshCore | ✅ | ⬜ |
+| Thinknode M7 | Meshtastic | ✅ | ⚠️ |
+
+Key: ✅ confirmed reliable, ⚠️ works but the link is unreliable, ⬜ not tested yet.
+
+The **Thinknode M7** transmits fine over WiFi, but its wireless link drops often, so run it
+over **USB** for dependable delivery. Running a board that is not listed? Please open an
+[issue](../../issues) and tell us how it went.
 
 ### Channels: live vs. test
 
@@ -144,10 +157,11 @@ MeshWX keeps testing off the air people are actually watching:
 
 - **Channel 0 is the live channel**: real NWS alerts broadcast there (each radio's
   alert channel, index 0 by default).
-- **Channel 1 is the test channel**: the per-radio **Test** buttons and the manual-send
-  page transmit there, so testing never clutters the live alert channel.
+- **Channel 1 is the test channel**: the per-radio **Test** buttons transmit there, so
+  testing never clutters the live alert channel. The manual-send page broadcasts on the
+  **live** channel instead, since those are real messages you compose for people.
 
-Both are set in **Settings** (per-radio alert channel, plus a global **Test channel**).
+Both are set in **Settings** (per-radio alert channel, plus a per-radio **Test channel**).
 Point your listening node at channel 0 for real alerts, or channel 1 to watch tests.
 
 ### Repeat sends
