@@ -147,10 +147,6 @@ this list grows as they are confirmed.
 
 Key: ✅ confirmed reliable, ⚠️ works but the link is unreliable, ⬜ not tested yet.
 
-The **Thinknode M7** transmits fine over WiFi, but its wireless link drops often, so run it
-over **USB** for dependable delivery. Running a board that is not listed? Please open an
-[issue](../../issues) and tell us how it went.
-
 ### Channels: live vs. test
 
 MeshWX keeps testing off the air people are actually watching:
