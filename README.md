@@ -230,4 +230,4 @@ mesh, open an [issue](../../issues) or pull request and you'll be added here.
 
 [MIT](LICENSE). Free to use, modify, and share. Contributions welcome.
 
-<p align="center"><sub>Developed by <a href="https://BrokenSignal.tv/MeshWX">BrokenSignal</a></sub></p>
+<p align="center"><sub>Developed by <a href="https://brokensignal.tv/MeshWX/">BrokenSignal</a></sub></p>

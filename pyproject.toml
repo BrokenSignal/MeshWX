@@ -9,7 +9,7 @@ authors = [{ name = "BrokenSignal" }]
 keywords = ["meshtastic", "meshcore", "nws", "weather", "alerts", "emergency", "lora"]
 
 [project.urls]
-Homepage = "https://BrokenSignal.tv/MeshWX"
+Homepage = "https://brokensignal.tv/MeshWX/"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
