@@ -115,3 +115,21 @@ def test_fmt_local():
     from app.formatter import fmt_local
     assert fmt_local("2026-07-28T05:40:28+00:00", "America/New_York") == "Jul 28, 1:40 AM"
     assert fmt_local("", "America/New_York") == ""
+
+
+def test_blank_timezone_falls_back_to_local_not_utc():
+    """A blank/invalid timezone must render in the machine's LOCAL time, never
+    silently in UTC (which reads as hours-off to the operator)."""
+    from datetime import datetime, timezone
+    from app.formatter import _to_local
+    iso = "2026-08-02T01:30:00+00:00"          # 01:30 UTC
+    # blank tz -> local time
+    dt_local = _to_local(iso, "")
+    assert dt_local is not None
+    assert dt_local.utcoffset() == datetime.now().astimezone().utcoffset()
+    # invalid tz name -> also local, not left as UTC
+    dt_bad = _to_local(iso, "Not/AZone")
+    assert dt_bad.utcoffset() == datetime.now().astimezone().utcoffset()
+    # explicit valid zone still honored
+    dt_ny = _to_local(iso, "America/New_York")
+    assert dt_ny.strftime("%H:%M") == "21:30"  # 01:30 UTC = 21:30 EDT (prev day)

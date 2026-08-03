@@ -30,11 +30,17 @@ def _to_local(iso: str, tz_name: str):
         dt = datetime.fromisoformat(iso)
     except ValueError:
         return None
+    if tz_name:
+        try:
+            return dt.astimezone(ZoneInfo(tz_name))
+        except (ZoneInfoNotFoundError, ValueError):
+            pass  # configured zone unavailable; fall through to local time
+    # No zone set (or it could not be resolved): use this machine's local time
+    # rather than leaving it in UTC, which reads as hours-off to the operator.
     try:
-        dt = dt.astimezone(ZoneInfo(tz_name))
-    except (ZoneInfoNotFoundError, ValueError):
-        pass
-    return dt
+        return dt.astimezone()
+    except Exception:
+        return dt
 
 
 def _clock(dt) -> str:

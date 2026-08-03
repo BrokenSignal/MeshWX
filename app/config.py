@@ -83,7 +83,7 @@ DEFAULT_SETTINGS: dict = {
     "meshcore_test_channel": 1,
     "dry_run": True,
     "test_channel": 1,   # tests + manual sends use this channel (keep off the live alert channel 0)
-    "display_timezone": "America/New_York",
+    "display_timezone": "",   # blank = use this computer's local time zone
     # Filter rules (editable). An alert is INCLUDED when its event is in
     # filter_include_exact OR ends with any suffix in filter_include_suffix,
     # UNLESS the event is in filter_exclude_exact.

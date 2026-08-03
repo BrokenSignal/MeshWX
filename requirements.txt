@@ -6,3 +6,4 @@ python-multipart==0.0.20
 meshtastic==2.5.9
 pyserial==3.5
 meshcore==2.3.8
+tzdata==2026.3

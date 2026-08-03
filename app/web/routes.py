@@ -31,9 +31,9 @@ TEMPLATES.env.filters["localtime"] = fmt_local
 
 def render(request: Request, name: str, **ctx):
     try:
-        tz = request.app.state.db.get_setting("display_timezone", "America/New_York")
+        tz = request.app.state.db.get_setting("display_timezone", "")
     except Exception:
-        tz = "America/New_York"
+        tz = ""   # fall back to this machine's local time
     return TEMPLATES.TemplateResponse(
         request, name, {"max_bytes": MAX_PAYLOAD_BYTES, "tz": tz, **ctx}
     )
@@ -86,7 +86,7 @@ def _spark(counts):
 
 def _dash_ctx(request) -> dict:
     db, tx, poller = _db(request), _tx(request), _poller(request)
-    tz = db.get_setting("display_timezone", "America/New_York")
+    tz = db.get_setting("display_timezone", "")
     zones = [z.strip() for z in (db.get_setting("zones", "") or "").split(",") if z.strip()]
     forecast = [z for z in zones if len(z) > 2 and z[2] == "Z"]
     county = [z for z in zones if len(z) > 2 and z[2] == "C"]

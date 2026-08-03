@@ -136,8 +136,11 @@
                value="{{ s.poll_interval }}" required></div>
       <div><label>NWS contact (email, sent in the request header)</label>
         <input name="nws_contact" value="{{ s.nws_contact }}" required></div>
-      <div><label>Display timezone (IANA)</label>
-        <input name="display_timezone" value="{{ s.display_timezone }}" required></div>
+      <div><label>Display timezone</label>
+        <input name="display_timezone" value="{{ s.display_timezone }}"
+               placeholder="leave blank to use this computer's time zone">
+        <div class="hint" style="margin-top:4px;">Blank uses this computer's local time. Or set an
+          IANA name like <code>America/New_York</code> or <code>America/Chicago</code>.</div></div>
     </div>
   </div>
 

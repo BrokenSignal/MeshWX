@@ -126,7 +126,7 @@ class WxPoller:
         self._db.prune_history()
 
         rules = FilterRules.from_settings(settings)
-        tz_name = settings.get("display_timezone", "America/New_York")
+        tz_name = settings.get("display_timezone", "")
         channel = int(settings.get("channel_index", 0))
         dry_run = bool(settings.get("dry_run", True))
 
