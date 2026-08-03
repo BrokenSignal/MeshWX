@@ -83,16 +83,23 @@ pinning a device path (they renumber on replug). See the compose file for detail
 
 ### 🥧 Raspberry Pi / Linux (native, no Docker)
 
-64-bit Raspberry Pi OS (or any Debian/Ubuntu). Plug in your radio, then:
+64-bit Raspberry Pi OS, or any Debian / Ubuntu. Plug in your radio, then run the one-liner:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BrokenSignal/MeshWX/main/install.sh | sudo bash
+```
+
+That installs everything it needs (Python, venv, pip, git), clones MeshWX to `/opt/MeshWX`,
+creates a virtualenv, adds you to the `dialout` group for serial access, and installs a
+`systemd` service that starts on boot. Opens on `http://<pi>:8110`. Re-run any time to update.
+
+Prefer to clone yourself? The installer still handles the prerequisites:
 
 ```bash
 git clone https://github.com/BrokenSignal/MeshWX.git
 cd MeshWX
 sudo ./packaging/install-linux.sh
 ```
-
-This creates a virtualenv, adds you to the `dialout` group for serial access, and installs
-a `systemd` service that starts on boot. Opens on `http://<pi>:8110`.
 
 Tested on 64-bit Raspberry Pi OS Bookworm (Python 3.11): every dependency installs as a
 prebuilt `aarch64` wheel, so no compiler or Rust toolchain is needed.

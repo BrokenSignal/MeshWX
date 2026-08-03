@@ -1,9 +1,13 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-jinja2==3.1.5
-httpx==0.28.1
-python-multipart==0.0.20
-meshtastic==2.5.9
-pyserial==3.5
-meshcore==2.3.8
-tzdata==2026.3
+# Version ranges (not exact pins) so a fresh install resolves working wheels on
+# whatever Python the host ships (verified on CPython 3.11 through 3.14). Exact
+# pins previously broke native installs when the host Python was newer than the
+# pinned libraries supported (e.g. meshtastic 2.5.9 caps at <3.14).
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+jinja2>=3.1,<4
+httpx>=0.28,<1
+python-multipart>=0.0.20
+meshtastic>=2.7.5,<3
+pyserial>=3.5,<4
+meshcore>=2.3.8,<3
+tzdata>=2024.1
