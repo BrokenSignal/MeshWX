@@ -26,7 +26,12 @@
   <div class="rec">
     <div class="rec-head">
       <span class="rec-time">{{ r["ts"] | localtime(tz) }}</span>
-      <span class="pill {{ r['disposition'] }}">{{ r["disposition"] }}</span>
+      {% set _dry = r["detail"] and (r["detail"] | string).startswith("DRY-RUN") %}
+      {% if r["disposition"] in ["sent", "update", "cancelled"] and _dry %}
+        <span class="pill held" title="Matched your rules but broadcasting was paused, so it was not sent">would send</span>
+      {% else %}
+        <span class="pill {{ r['disposition'] }}">{{ r["disposition"] }}</span>
+      {% endif %}
     </div>
     <div class="rec-event">{{ r["event"] }}</div>
     <div class="rec-msgrow">
