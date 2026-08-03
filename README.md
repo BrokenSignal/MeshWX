@@ -83,26 +83,32 @@ pinning a device path (they renumber on replug). See the compose file for detail
 
 ### 🥧 Raspberry Pi / Linux (native, no Docker)
 
-64-bit Raspberry Pi OS, or any Debian / Ubuntu. Plug in your radio, then run the one-liner:
+64-bit Raspberry Pi OS, or any Debian / Ubuntu. Plug in your radio, then run **one command**:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/BrokenSignal/MeshWX/main/install.sh | sudo bash
 ```
 
-That installs everything it needs (Python, venv, pip, git), clones MeshWX to `/opt/MeshWX`,
-creates a virtualenv, adds you to the `dialout` group for serial access, and installs a
-`systemd` service that starts on boot. Opens on `http://<pi>:8110`. Re-run any time to update.
+That is the whole install. It installs everything it needs (Python, venv, pip, git), puts
+MeshWX in `/opt/MeshWX`, sets up a virtualenv, adds you to the `dialout` group for serial
+access, and starts a `systemd` service on boot. Open `http://<this-host>:8110`.
 
-Prefer to clone yourself? The installer still handles the prerequisites:
+**To update, or if an install ever goes wrong, run the exact same command again.** It pulls
+the latest, repairs a stale or broken copy, and reinstalls. There is nothing else to
+remember and no folder to clean up.
+
+<details><summary>Advanced: clone and run the installer manually</summary>
 
 ```bash
 git clone https://github.com/BrokenSignal/MeshWX.git
-cd MeshWX
-sudo ./packaging/install-linux.sh
+cd MeshWX && sudo ./packaging/install-linux.sh
 ```
 
-Tested on 64-bit Raspberry Pi OS Bookworm (Python 3.11): every dependency installs as a
-prebuilt `aarch64` wheel, so no compiler or Rust toolchain is needed.
+The installer still handles all prerequisites and self-updates on each run.
+</details>
+
+Tested on 64-bit Raspberry Pi OS Bookworm and Ubuntu (Python 3.11 through 3.14): every
+dependency installs as a prebuilt wheel, so no compiler or Rust toolchain is needed.
 Manage with `sudo systemctl restart mesh-wx` and `journalctl -u mesh-wx -f`.
 
 ### 🪟 Windows

@@ -22,6 +22,16 @@ if [ "$(id -u)" -ne 0 ]; then
   die "Please run with sudo:  sudo ./packaging/install-linux.sh"
 fi
 
+# ---- 0. self-update ----------------------------------------------------
+# A stale checkout must never install old code. If this is a git checkout,
+# pull the latest first, then re-exec the (possibly updated) installer once.
+if [ -z "${MESHWX_NO_SELFUPDATE:-}" ] && [ -d "$DIR/.git" ] && command -v git >/dev/null 2>&1; then
+  say "updating MeshWX to the latest version"
+  git config --global --add safe.directory "$DIR" 2>/dev/null || true
+  git -C "$DIR" pull --ff-only --quiet 2>/dev/null || warn "could not update; continuing with the local copy"
+  MESHWX_NO_SELFUPDATE=1 exec bash "$DIR/packaging/install-linux.sh" "$@"
+fi
+
 # ---- 1. system prerequisites -------------------------------------------
 # Debian/Ubuntu split the venv module into its own package; install it up front
 # so users never hit "python3-venv not available" or a broken ensurepip.

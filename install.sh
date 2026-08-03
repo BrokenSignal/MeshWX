@@ -18,12 +18,19 @@ if command -v apt-get >/dev/null 2>&1; then
   apt-get update -qq && apt-get install -y -qq git
 fi
 
+clone_fresh() { rm -rf "$DEST"; git clone --depth 1 "$REPO" "$DEST"; }
+
 if [ -d "$DEST/.git" ]; then
   echo ">> updating existing checkout at $DEST"
-  git -C "$DEST" pull --ff-only
+  git config --global --add safe.directory "$DEST" 2>/dev/null || true
+  git -C "$DEST" pull --ff-only --quiet || { echo ">> update failed; re-cloning clean"; clone_fresh; }
+elif [ -e "$DEST" ]; then
+  echo ">> $DEST exists but is not a MeshWX checkout; replacing it"
+  clone_fresh
 else
   echo ">> cloning MeshWX to $DEST"
   git clone --depth 1 "$REPO" "$DEST"
 fi
 
-exec bash "$DEST/packaging/install-linux.sh"
+# install-linux.sh self-updates too, but we just pulled -- skip its re-exec.
+MESHWX_NO_SELFUPDATE=1 exec bash "$DEST/packaging/install-linux.sh"
