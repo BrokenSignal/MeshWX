@@ -257,6 +257,24 @@ _STATES = [
     ("PR","Puerto Rico"),("VI","U.S. Virgin Islands"),("GU","Guam"),
 ]
 
+# Timezones offered in Settings. MeshWX serves the US NWS, so this is the US /
+# territories set plus an "Automatic" option (blank = the device's local zone).
+_TIMEZONES = [
+    ("", "Automatic (this device's time zone)"),
+    ("America/New_York", "Eastern (New York)"),
+    ("America/Chicago", "Central (Chicago)"),
+    ("America/Denver", "Mountain (Denver)"),
+    ("America/Phoenix", "Mountain, no DST (Arizona)"),
+    ("America/Los_Angeles", "Pacific (Los Angeles)"),
+    ("America/Anchorage", "Alaska"),
+    ("America/Adak", "Hawaii-Aleutian (Adak)"),
+    ("Pacific/Honolulu", "Hawaii (Honolulu)"),
+    ("America/Puerto_Rico", "Atlantic (Puerto Rico, U.S. Virgin Islands)"),
+    ("Pacific/Guam", "Chamorro (Guam, Northern Marianas)"),
+    ("Pacific/Pago_Pago", "Samoa (American Samoa)"),
+    ("UTC", "UTC"),
+]
+
 _EVENT_GROUPS = {
     "Warnings": ["Tornado Warning","Severe Thunderstorm Warning","Flash Flood Warning",
         "Flood Warning","Hurricane Warning","Tropical Storm Warning","Storm Surge Warning",
@@ -314,6 +332,8 @@ async def settings_page(request: Request):
     return render(
         request, "settings.html", s=s, min_interval=POLL_INTERVAL_MIN, ports=None,
         states=_STATES, current_state=current_state, state=current_state,
+        timezones=_TIMEZONES, tz_current=(s.get("display_timezone", "") or ""),
+        tz_known={v for v, _ in _TIMEZONES},
         counties=county_list, selected=set(counties_sel), extra_zones=", ".join(extra),
         event_groups=_EVENT_GROUPS,
         selected_events=set(s.get("filter_include_exact", []) or []),

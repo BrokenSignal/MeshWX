@@ -137,10 +137,16 @@
       <div><label>NWS contact (email, sent in the request header)</label>
         <input name="nws_contact" value="{{ s.nws_contact }}" required></div>
       <div><label>Display timezone</label>
-        <input name="display_timezone" value="{{ s.display_timezone }}"
-               placeholder="leave blank to use this computer's time zone">
-        <div class="hint" style="margin-top:4px;">Blank uses this computer's local time. Or set an
-          IANA name like <code>America/New_York</code> or <code>America/Chicago</code>.</div></div>
+        <select name="display_timezone">
+          {% for val, lbl in timezones %}
+          <option value="{{ val }}" {% if val == tz_current %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+          {% if tz_current and tz_current not in tz_known %}
+          <option value="{{ tz_current }}" selected>{{ tz_current }}</option>
+          {% endif %}
+        </select>
+        <div class="hint" style="margin-top:4px;">Sets the time zone for timestamps and alert
+          times. <b>Automatic</b> uses this device's own time zone.</div></div>
     </div>
   </div>
 
