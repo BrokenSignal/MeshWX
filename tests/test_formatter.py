@@ -133,3 +133,18 @@ def test_blank_timezone_falls_back_to_local_not_utc():
     # explicit valid zone still honored
     dt_ny = _to_local(iso, "America/New_York")
     assert dt_ny.strftime("%H:%M") == "21:30"  # 01:30 UTC = 21:30 EDT (prev day)
+
+
+def test_iana_zone_resolves_without_system_tzdb():
+    """Guards the tzdata dependency: with the system tz database disabled (the
+    Windows situation), an explicit IANA zone must STILL resolve -- otherwise
+    timestamps silently render in UTC. Fails if tzdata is dropped from deps."""
+    import zoneinfo
+    saved = list(zoneinfo.TZPATH)
+    try:
+        zoneinfo.reset_tzpath([])          # no system zoneinfo dirs (Windows-like)
+        from app.formatter import _to_local
+        dt = _to_local("2026-08-02T01:30:00+00:00", "America/New_York")
+        assert dt.strftime("%H:%M") == "21:30", "IANA zone must resolve via tzdata pkg"
+    finally:
+        zoneinfo.reset_tzpath(saved)
