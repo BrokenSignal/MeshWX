@@ -1,6 +1,6 @@
 [project]
 name = "meshwx"
-version = "1.0.5"
+version = "1.0.6"
 description = "Poll NWS weather alerts and broadcast them over Meshtastic and/or MeshCore radios"
 readme = "README.md"
 requires-python = ">=3.11"
