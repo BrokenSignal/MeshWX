@@ -411,7 +411,7 @@ async def save_settings(
     poll_interval: int = Form(...),
     nws_contact: str = Form(...),
     channel_index: int = Form(0),
-    display_timezone: str = Form(...),
+    display_timezone: str = Form(""),   # blank = Automatic (device local time)
     serial_port: str = Form(""),
     state: str = Form(""),
     counties: list[str] = Form(default=[]),
