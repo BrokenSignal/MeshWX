@@ -31,7 +31,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -62,3 +62,6 @@ jobs:
         with:
           files: MeshWX-windows-${{ github.ref_name }}.zip
           generate_release_notes: true
+          # A tag with a hyphen (e.g. v1.0.3-rc1) is a prerelease: keep it out of
+          # "Latest" so test builds never supersede a real release.
+          prerelease: ${{ contains(github.ref_name, '-') }}
