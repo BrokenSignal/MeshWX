@@ -13,14 +13,7 @@
         <div class="meta">{{ a.area or a.detail }}</div>
         {% if a.text %}<div class="txt">{{ a.text }}</div>{% endif %}
       </div>
-      <div class="side">
-        {% set _dry = a.detail and (a.detail | string).startswith("DRY-RUN") %}
-        {% if a.disposition in ["sent", "update", "cancelled"] and _dry %}
-        <span class="pill held" title="Matched your rules but broadcasting was paused, so it was not sent">would send</span>
-        {% else %}
-        <span class="pill {{ a.disposition }}">{{ a.disposition }}</span>
-        {% endif %}
-        <span class="time">{{ a.when }}</span></div>
+      <div class="side"><span class="pill {{ a.disposition }}">{{ disp_label.get(a.disposition, a.disposition) }}</span><span class="time">{{ a.when }}</span></div>
     </div>
     {% else %}
     <div class="arow"><div class="meta">No alerts logged yet.</div></div>

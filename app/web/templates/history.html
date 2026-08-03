@@ -9,7 +9,7 @@
       <select name="disposition">
         <option value="">all</option>
         {% for d in dispositions %}
-        <option value="{{ d }}" {% if d == disposition %}selected{% endif %}>{{ d }}</option>
+        <option value="{{ d }}" {% if d == disposition %}selected{% endif %}>{{ disp_label.get(d, d) }}</option>
         {% endfor %}
       </select>
     </div>
@@ -26,12 +26,7 @@
   <div class="rec">
     <div class="rec-head">
       <span class="rec-time">{{ r["ts"] | localtime(tz) }}</span>
-      {% set _dry = r["detail"] and (r["detail"] | string).startswith("DRY-RUN") %}
-      {% if r["disposition"] in ["sent", "update", "cancelled"] and _dry %}
-        <span class="pill held" title="Matched your rules but broadcasting was paused, so it was not sent">would send</span>
-      {% else %}
-        <span class="pill {{ r['disposition'] }}">{{ r["disposition"] }}</span>
-      {% endif %}
+      <span class="pill {{ r['disposition'] }}">{{ disp_label.get(r["disposition"], r["disposition"]) }}</span>
     </div>
     <div class="rec-event">{{ r["event"] }}</div>
     <div class="rec-msgrow">

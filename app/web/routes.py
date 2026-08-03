@@ -29,13 +29,27 @@ from ..formatter import fmt_local
 TEMPLATES.env.filters["localtime"] = fmt_local
 
 
+# History/dashboard status labels describe the FILTER decision, not transmission
+# (whether a message actually went out lives in the Transmit Log). So "sent"
+# becomes "pass" (the alert passed your rules); the rest already describe the
+# alert, not a send.
+DISP_LABELS = {
+    "sent": "pass",
+    "filtered": "filtered",
+    "update": "update",
+    "cancelled": "cancelled",
+    "duplicate": "duplicate",
+}
+
+
 def render(request: Request, name: str, **ctx):
     try:
         tz = request.app.state.db.get_setting("display_timezone", "")
     except Exception:
         tz = ""   # fall back to this machine's local time
     return TEMPLATES.TemplateResponse(
-        request, name, {"max_bytes": MAX_PAYLOAD_BYTES, "tz": tz, **ctx}
+        request, name,
+        {"max_bytes": MAX_PAYLOAD_BYTES, "tz": tz, "disp_label": DISP_LABELS, **ctx},
     )
 
 
