@@ -23,12 +23,16 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # ---- 0. self-update ----------------------------------------------------
-# A stale checkout must never install old code. If this is a git checkout,
-# pull the latest first, then re-exec the (possibly updated) installer once.
+# A stale or locally-corrupted checkout must never install old code. Force the
+# tracked files to match the published version (reset --hard rewrites only
+# tracked files, so the gitignored data/ database + .venv/ are left alone), then
+# re-exec the (possibly updated) installer once.
 if [ -z "${MESHWX_NO_SELFUPDATE:-}" ] && [ -d "$DIR/.git" ] && command -v git >/dev/null 2>&1; then
   say "updating MeshWX to the latest version"
   git config --global --add safe.directory "$DIR" 2>/dev/null || true
-  git -C "$DIR" pull --ff-only --quiet 2>/dev/null || warn "could not update; continuing with the local copy"
+  if git -C "$DIR" fetch --quiet origin 2>/dev/null \
+     && git -C "$DIR" reset --hard --quiet '@{u}' 2>/dev/null; then :; \
+  else warn "could not update; continuing with the local copy"; fi
   MESHWX_NO_SELFUPDATE=1 exec bash "$DIR/packaging/install-linux.sh" "$@"
 fi
 
