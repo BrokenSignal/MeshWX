@@ -204,6 +204,15 @@ def _dash_ctx(request) -> dict:
     }
 
 
+# ---- liveness probe ----------------------------------------------------
+@router.get("/healthz", response_class=PlainTextResponse)
+async def healthz(request: Request):
+    # If this responds, the event loop is servicing requests (i.e. not wedged).
+    # Used by the Docker HEALTHCHECK; deliberately does no DB/radio work so it
+    # is a pure liveness signal, not a readiness check.
+    return PlainTextResponse("ok")
+
+
 # ---- dashboard ---------------------------------------------------------
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):

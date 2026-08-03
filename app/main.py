@@ -12,9 +12,17 @@ from .db import Database
 from .logging_setup import setup_logging
 from .poller import WxPoller
 from .transmit import TransmitManager
+from .watchdog import Liveness
 from .web.routes import router
 
 logger = logging.getLogger("mesh_wx.main")
+
+
+async def _heartbeat(liveness: Liveness) -> None:
+    """Refresh the liveness heartbeat while the event loop is healthy."""
+    while True:
+        liveness.beat()
+        await asyncio.sleep(5)
 
 
 async def _startup_serial(db: Database, tx: TransmitManager) -> None:
@@ -53,6 +61,12 @@ async def lifespan(app: FastAPI):
     app.state.tx = tx
     app.state.poller = poller
 
+    # Liveness watchdog: force a restart if the event loop ever wedges.
+    liveness = Liveness(stall_seconds=90.0)
+    liveness.start()
+    beat_task = asyncio.create_task(_heartbeat(liveness))
+    app.state.liveness = liveness
+
     tx.start()
     # Connect the radios in the background so serial probing never blocks the
     # web server from coming up (a non-node USB port can take 30s+ to time out).
@@ -64,6 +78,8 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         logger.info("shutting down mesh-wx")
+        liveness.stop()          # first: never force-exit during a clean shutdown
+        beat_task.cancel()
         if not startup_task.done():
             startup_task.cancel()
         await poller.stop()

@@ -91,3 +91,30 @@ def test_safe_result_swallows_callback_errors():
 
     # Must not raise -- a broken callback cannot be allowed to crash the worker.
     tm._safe_result(boom, True)
+
+
+def test_liveness_watchdog_forces_exit_when_stalled(monkeypatch):
+    """A stalled event loop (no heartbeat) must trigger a force-exit so the
+    restart policy relaunches; a beating loop must NOT."""
+    import time
+    import app.watchdog as wd
+
+    calls = []
+    monkeypatch.setattr(wd.os, "_exit", lambda code: calls.append(code))
+
+    # Stalled: never beat -> should force-exit within a couple check intervals.
+    lv = wd.Liveness(stall_seconds=0.3)
+    lv.start()
+    time.sleep(0.6)
+    lv.stop()
+    assert calls, "watchdog should force-exit when the loop stalls"
+
+    # Healthy: beat continuously -> must NOT force-exit.
+    calls.clear()
+    lv2 = wd.Liveness(stall_seconds=0.3)
+    lv2.start()
+    for _ in range(6):
+        lv2.beat()
+        time.sleep(0.1)
+    lv2.stop()
+    assert not calls, "watchdog must not fire while the loop is beating"

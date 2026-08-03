@@ -16,4 +16,10 @@ COPY app ./app
 VOLUME ["/data"]
 EXPOSE 8000
 
+# Liveness: mark the container unhealthy if the app stops responding. The app's
+# own watchdog force-exits a wedged loop (so restart:unless-stopped relaunches
+# it); this HEALTHCHECK makes that state visible to `docker ps` and orchestrators.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status==200 else 1)"]
+
 CMD ["python", "-m", "app.main"]
