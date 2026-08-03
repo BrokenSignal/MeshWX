@@ -1,0 +1,28 @@
+{% for r in rows %}
+<div class="rec">
+  <div class="rec-head">
+    <span class="rec-time">{{ r["ts"] | localtime(tz) }}</span>
+    <span class="pill {{ r['disposition'] }}">{{ disp_label.get(r["disposition"], r["disposition"]) }}</span>
+  </div>
+  <div class="rec-event">{{ r["event"] }}</div>
+  <div class="rec-msgrow">
+    <div class="rec-msgwrap">
+      <div class="rec-lbl">TX Message</div>
+      {% if r["transmitted_text"] %}
+      <div class="rec-msg">{{ r["transmitted_text"] }}</div>
+      {% else %}
+      <div class="rec-msg none">not transmitted</div>
+      {% endif %}
+    </div>
+    {% if r["detail"] %}<div class="rec-detail">{{ r["detail"] }}</div>{% endif %}
+  </div>
+  {% if r["area"] %}
+  <div class="rec-areawrap">
+    <div class="rec-lbl">Area</div>
+    <div class="rec-area">{{ r["area"] }}</div>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="rec"><span class="hint">No history yet.</span></div>
+{% endfor %}

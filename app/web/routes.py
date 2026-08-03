@@ -215,6 +215,12 @@ async def status_partial(request: Request):
     return render(request, "_dash_top.html", **_dash_ctx(request))
 
 
+@router.get("/partials/dashboard", response_class=HTMLResponse)
+async def dashboard_cols_partial(request: Request):
+    # The recent-alerts list + radios + broadcasting columns, for live polling.
+    return render(request, "_dash_cols.html", **_dash_ctx(request))
+
+
 @router.post("/dry-run/toggle", response_class=HTMLResponse)
 async def toggle_dry_run(request: Request):
     db = _db(request)
@@ -239,11 +245,28 @@ async def history(request: Request, disposition: str = "", date_from: str = "",
     )
 
 
+@router.get("/partials/history", response_class=HTMLResponse)
+async def history_partial(request: Request, disposition: str = "", date_from: str = "",
+                          date_to: str = ""):
+    # Just the rows, honoring the same filters, for live polling.
+    rows = _db(request).query_history(
+        disposition=disposition or None,
+        date_from=date_from or None,
+        date_to=date_to or None,
+    )
+    return render(request, "_history_rows.html", rows=rows)
+
+
 # ---- transmit log ------------------------------------------------------
 @router.get("/transmit-log", response_class=HTMLResponse)
 async def transmit_log(request: Request):
     rows = _db(request).query_transmit_log()
     return render(request, "transmit_log.html", rows=rows)
+
+
+@router.get("/partials/transmit-log", response_class=HTMLResponse)
+async def transmit_log_partial(request: Request):
+    return render(request, "_transmit_rows.html", rows=_db(request).query_transmit_log())
 
 
 @router.post("/transmit-log/resend/{entry_id}", response_class=HTMLResponse)

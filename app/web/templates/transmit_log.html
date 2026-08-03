@@ -2,7 +2,8 @@
 {% block title %} &middot; Transmit Log{% endblock %}
 {% block content %}
 <h2>Transmit Log</h2>
-<div class="panel" style="padding:0;" id="tx-rows">
+<div class="panel" style="padding:0;" id="tx-rows"
+     hx-get="/partials/transmit-log" hx-trigger="every 10s" hx-swap="innerHTML">
   {% include "_transmit_rows.html" %}
 </div>
 {% endblock %}

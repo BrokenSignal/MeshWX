@@ -1,0 +1,43 @@
+<section class="panel" style="padding:0;">
+  <div class="panel-head"><h3>Recent alerts</h3><a class="see" href="/history">View history &rarr;</a></div>
+  {% for a in recent %}
+  <div class="arow">
+    <div>
+      <div class="ev">{{ a.event }}</div>
+      <div class="meta">{{ a.area or a.detail }}</div>
+      {% if a.text %}<div class="txt">{{ a.text }}</div>{% endif %}
+    </div>
+    <div class="side"><span class="pill {{ a.disposition }}">{{ disp_label.get(a.disposition, a.disposition) }}</span><span class="time">{{ a.when }}</span></div>
+  </div>
+  {% else %}
+  <div class="arow"><div class="meta">No alerts logged yet.</div></div>
+  {% endfor %}
+</section>
+
+<aside>
+  <section class="panel" style="padding:0;margin-bottom:18px;">
+    <div class="panel-head"><h3>Radios</h3></div>
+    {% for t in transports if t.enabled %}
+    <div class="node">
+      <div class="node-top">
+        <span class="node-name">{{ t.label }}</span>
+        <span class="dot {{ 'ok' if t.connected else 'bad' }}">{{ "Connected" if t.connected else "Offline" }}</span>
+      </div>
+      <div class="node-meta">
+        {{ "USB" if t.conn == "serial" else "Network" }} &middot;
+        {{ t.target or "not configured" }} &middot; ch {{ t.channel }}
+      </div>
+      {% if t.error and not t.connected %}<div class="node-err">{{ t.error }}</div>{% endif %}
+    </div>
+    {% else %}
+    <div class="kv"><span class="k">No radios enabled</span><span class="v"><a class="see" href="/settings">Set up &rarr;</a></span></div>
+    {% endfor %}
+    <div class="kv"><span class="k">Last TX</span><span class="v">{{ last_tx }}</span></div>
+  </section>
+  <section class="panel" style="padding:0;">
+    <div class="panel-head"><h3>Broadcasting</h3><a class="see" href="/settings">Edit &rarr;</a></div>
+    <div class="chips">
+      {% for ev in include %}<span class="chip">{{ ev }}</span>{% endfor %}
+    </div>
+  </section>
+</aside>
