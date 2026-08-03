@@ -13,7 +13,7 @@
     <div>
       <h2 class="pt">Dashboard</h2>
       {% set rnames = transports | selectattr('enabled') | map(attribute='label') | list %}
-      <p class="sub">NWS &rarr; {{ rnames | join(' + ') if rnames else 'no radios' }} &middot; Broader Midlands SC</p>
+      <p class="sub">NWS &rarr; {{ rnames | join(' + ') if rnames else 'no radios' }}</p>
     </div>
     <div class="topbar-right">
       <span class="live-pill{{ ' paused' if dry_run else '' }}"><span class="dot"></span>{{ "PAUSED" if dry_run else "Broadcasting LIVE" }}</span>
