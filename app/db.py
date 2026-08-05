@@ -69,9 +69,27 @@ CREATE TABLE IF NOT EXISTS events (
     message TEXT
 );
 
+-- IPAWS (FEMA) alerts: kept fully separate from the NWS weather pipeline above.
+CREATE TABLE IF NOT EXISTS ipaws_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,
+    identifier  TEXT UNIQUE,
+    sender      TEXT,
+    event       TEXT,
+    area        TEXT,
+    headline    TEXT,
+    msg_type    TEXT,
+    status      TEXT,
+    sent        TEXT,
+    text        TEXT,
+    transmitted INTEGER,
+    error       TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_history_ts ON history(ts);
 CREATE INDEX IF NOT EXISTS idx_history_disp ON history(disposition);
 CREATE INDEX IF NOT EXISTS idx_txlog_ts ON transmit_log(ts);
+CREATE INDEX IF NOT EXISTS idx_ipaws_ts ON ipaws_log(ts);
 """
 
 
@@ -329,6 +347,52 @@ class Database:
             return self._conn.execute(
                 "SELECT * FROM events ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
+
+    # ---- IPAWS (separate from the weather pipeline) --------------------
+    def ipaws_seen(self, identifier: str) -> bool:
+        with self._lock:
+            return self._conn.execute(
+                "SELECT 1 FROM ipaws_log WHERE identifier = ?", (identifier,)
+            ).fetchone() is not None
+
+    def add_ipaws(self, identifier, sender, event, area, headline, msg_type,
+                  status, sent, text, transmitted, error="") -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT OR IGNORE INTO ipaws_log(ts, identifier, sender, event, area, "
+                "headline, msg_type, status, sent, text, transmitted, error) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (_now(), identifier, sender, event, area, headline, msg_type,
+                 status, sent, text, 1 if transmitted else 0, error),
+            )
+            self._conn.commit()
+
+    def update_ipaws(self, identifier: str, transmitted: bool, error: str = "") -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE ipaws_log SET transmitted = ?, error = ? WHERE identifier = ?",
+                (1 if transmitted else 0, error, identifier))
+            self._conn.commit()
+
+    def get_ipaws(self, identifier: str):
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM ipaws_log WHERE identifier = ?", (identifier,)
+            ).fetchone()
+
+    def query_ipaws(self, limit: int = 60) -> list[sqlite3.Row]:
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM ipaws_log ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+
+    def prune_ipaws(self, keep_days: int = 14) -> int:
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM ipaws_log WHERE ts < datetime('now', ?)",
+                ("-%d days" % keep_days,))
+            self._conn.commit()
+            return cur.rowcount
 
     def close(self) -> None:
         with self._lock:

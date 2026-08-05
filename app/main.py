@@ -11,6 +11,7 @@ from .config import load_bootstrap
 from .db import Database
 from .logging_setup import setup_logging
 from .poller import WxPoller
+from .ipaws import IpawsPoller
 from .transmit import TransmitManager
 from .watchdog import Liveness
 from .web.routes import router
@@ -55,11 +56,13 @@ async def lifespan(app: FastAPI):
     db = Database(cfg.db_path)
     tx = TransmitManager(db)
     poller = WxPoller(db, tx)
+    ipaws = IpawsPoller(db, tx)
 
     app.state.cfg = cfg
     app.state.db = db
     app.state.tx = tx
     app.state.poller = poller
+    app.state.ipaws = ipaws
 
     # Liveness watchdog: force a restart if the event loop ever wedges.
     liveness = Liveness(stall_seconds=90.0)
@@ -73,6 +76,7 @@ async def lifespan(app: FastAPI):
     startup_task = asyncio.create_task(_startup_serial(db, tx))
     app.state.startup_task = startup_task
     poller.start()
+    ipaws.start()
 
     try:
         yield
@@ -83,6 +87,7 @@ async def lifespan(app: FastAPI):
         if not startup_task.done():
             startup_task.cancel()
         await poller.stop()
+        await ipaws.stop()
         await tx.stop()
         db.close()
 

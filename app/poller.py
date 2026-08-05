@@ -181,7 +181,7 @@ class WxPoller:
             # loud alarm -- a warning that did not go out must not be forgotten.
             fail_ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-            def _on_result(ok, a=alert, d=decision, t=text, ts=fail_ts):
+            def _on_result(ok, err="", a=alert, d=decision, t=text, ts=fail_ts):
                 if ok:
                     self._record_state(a, d)
                 else:

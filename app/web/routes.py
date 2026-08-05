@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 import httpx
 
-from ..config import MAX_PAYLOAD_BYTES, POLL_INTERVAL_MIN
+from ..config import MAX_PAYLOAD_BYTES, POLL_INTERVAL_MIN, IPAWS_EVENT_TYPES
 from ..serial_discovery import list_all_ports
 
 
@@ -230,6 +230,29 @@ async def dashboard_cols_partial(request: Request):
     return render(request, "_dash_cols.html", **_dash_ctx(request))
 
 
+@router.get("/partials/ipaws", response_class=HTMLResponse)
+async def ipaws_partial(request: Request):
+    # IPAWS (FEMA) dashboard panel -- separate from the weather pipeline.
+    db = _db(request)
+    st = getattr(request.app.state, "ipaws", None)
+    return render(request, "_ipaws_panel.html", ipaws_rows=db.query_ipaws(30),
+                  ipaws_status=(st.status if st else None))
+
+
+@router.get("/ipaws", response_class=HTMLResponse)
+async def ipaws_history(request: Request):
+    # Full IPAWS history page (mirrors the NOAA History page).
+    db = _db(request)
+    st = getattr(request.app.state, "ipaws", None)
+    return render(request, "ipaws_history.html", ipaws_rows=db.query_ipaws(200),
+                  ipaws_status=(st.status if st else None))
+
+
+@router.get("/partials/ipaws-history", response_class=HTMLResponse)
+async def ipaws_history_partial(request: Request):
+    return render(request, "_ipaws_rows.html", ipaws_rows=_db(request).query_ipaws(200))
+
+
 @router.post("/dry-run/toggle", response_class=HTMLResponse)
 async def toggle_dry_run(request: Request):
     db = _db(request)
@@ -384,6 +407,11 @@ async def settings_page(request: Request):
         event_groups=_EVENT_GROUPS,
         selected_events=set(s.get("filter_include_exact", []) or []),
         all_warnings=bool(s.get("filter_include_suffix", []) or []), err="",
+        ipaws_enabled=bool(s.get("ipaws_enabled", True)),
+        ipaws_send_tests=bool(s.get("ipaws_send_tests", False)),
+        ipaws_event_types=IPAWS_EVENT_TYPES,
+        ipaws_selected=set(s.get("ipaws_events", None) if s.get("ipaws_events", None) is not None
+                           else [k for k, _l, _kw in IPAWS_EVENT_TYPES]),
         mt_enabled=bool(s.get("meshtastic_enabled", True)),
         mt_conn=s.get("meshtastic_conn", "serial") or "serial",
         mt_host=s.get("meshtastic_host", "") or "",
@@ -418,6 +446,9 @@ async def save_settings(
     extra_zones: str = Form(""),
     events: list[str] = Form(default=[]),
     all_warnings: str = Form(""),
+    ipaws_enabled: str = Form(""),
+    ipaws_send_tests: str = Form(""),
+    ipaws_events: list[str] = Form(default=[]),
     meshtastic_enabled: str = Form(""),
     meshtastic_conn: str = Form("serial"),
     meshtastic_host: str = Form(""),
@@ -449,6 +480,9 @@ async def save_settings(
     db.set_setting("filter_exclude_exact", [])
 
     # Radios - Meshtastic + MeshCore, each independently enabled.
+    db.set_setting("ipaws_enabled", bool(ipaws_enabled))
+    db.set_setting("ipaws_send_tests", bool(ipaws_send_tests))
+    db.set_setting("ipaws_events", [e for e in ipaws_events if e])
     db.set_setting("meshtastic_enabled", bool(meshtastic_enabled))
     db.set_setting("meshtastic_conn", (meshtastic_conn or "serial").strip())
     db.set_setting("meshtastic_host", meshtastic_host.strip())

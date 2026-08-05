@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %} &middot; IPAWS History{% endblock %}
+{% block content %}
+<h2>IPAWS Alerts (FEMA)</h2>
+<div class="panel">
+  <p class="hint">Public safety alerts from FEMA's IPAWS: AMBER Alerts, civil emergencies,
+    law enforcement warnings, and local emergency management messages, broadcast to your mesh.
+    Weather warnings are on the <a href="/history">NOAA</a> page. Cancellations are broadcast
+    as well, so people know when an order such as a shelter-in-place has been lifted.</p>
+  {% if ipaws_status %}
+  <div class="hint">Last poll: {{ (ipaws_status.last_poll_time | localtime(tz)) if ipaws_status.last_poll_time else "-" }}
+    &middot; {{ ipaws_status.last_result }} &middot; retransmitted {{ ipaws_status.transmitted }}</div>
+  {% endif %}
+</div>
+<div class="panel" style="padding:0;" id="ipaws-hist"
+     hx-get="/partials/ipaws-history" hx-trigger="every 15s" hx-swap="innerHTML">
+  {% include "_ipaws_rows.html" %}
+</div>
+{% endblock %}

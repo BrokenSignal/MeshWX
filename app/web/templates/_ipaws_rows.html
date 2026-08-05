@@ -1,0 +1,27 @@
+{% for r in ipaws_rows | default([]) %}
+<div class="rec">
+  <div class="rec-head">
+    <span class="rec-time">{{ r["ts"] | localtime(tz) }}</span>
+    <span style="display:flex;gap:8px;align-items:center;">
+      <span class="pill {{ 'cancelled' if r['msg_type'] == 'Cancel' else 'radio' }}">{{ r["msg_type"] }}</span>
+      {% if r["transmitted"] %}<span class="pill ok">sent</span>{% else %}<span class="pill muted">not sent</span>{% endif %}
+    </span>
+  </div>
+  <div class="rec-event">{{ r["event"] or "(no event)" }}</div>
+  <div class="rec-msgrow">
+    <div class="rec-msgwrap">
+      <div class="rec-lbl">Mesh message</div>
+      {% if r["text"] %}<div class="rec-msg">{{ r["text"] }}</div>{% else %}<div class="rec-msg none">{{ r["error"] or "not transmitted" }}</div>{% endif %}
+    </div>
+    <div class="rec-detail">{{ r["sender"] }}</div>
+  </div>
+  {% if r["area"] %}
+  <div class="rec-areawrap">
+    <div class="rec-lbl">Area</div>
+    <div class="rec-area">{{ r["area"] }}</div>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="rec"><span class="hint">No IPAWS alerts yet. Non-weather alerts appear here as they arrive.</span></div>
+{% endfor %}

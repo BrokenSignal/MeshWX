@@ -48,6 +48,9 @@ channel. Built after living through Hurricane Helene's comms blackout.
 
 - **Dual radio, side by side.** Run Meshtastic, MeshCore, or **both at once**: every
   alert goes to each enabled radio on its own channel.
+- **NOAA weather + FEMA IPAWS.** Broadcast NWS weather warnings and, optionally, non-weather
+  public safety alerts from IPAWS (AMBER, civil emergency, evacuation, and more), scoped to
+  your counties.
 - **Dead-simple setup.** Pick your state and check your counties; the NWS zones populate
   automatically. Choose which alerts to send from checklists, not cryptic codes to type.
 - **Smart filtering.** Broadcast all Warnings plus Tornado Watch by default; add other
@@ -182,6 +185,20 @@ transmitting. MeshWX confirms each send against the radio's own transmit counter
 is logged **sent** only when the radio really keyed up. A send that does not go out is
 retried and then logged **failed**, so a miss shows in the transmit log rather than being
 silently lost.
+
+### IPAWS alerts (FEMA)
+
+Alongside NOAA weather, MeshWX can broadcast **non-weather public safety alerts** from FEMA's
+IPAWS feed: AMBER Alerts, civil emergencies, evacuations, shelter-in-place, law enforcement,
+911/utility outages, hazardous materials, and local emergency management messages. Enable it
+and pick which types to broadcast in **Settings**; the **IPAWS History** page shows what has
+come through.
+
+- **Scoped to your area** automatically, using the same counties you selected for weather.
+- **Real alerts go on your live channel**; optional test/exercise messages go on the test
+  channel (tagged `[IPAWS TEST]`) so you can confirm the mesh during quiet stretches.
+- Weather alerts already carried by NOAA are not duplicated, and cancellations are broadcast
+  so people know when an order is lifted.
 
 ## Configuration
 

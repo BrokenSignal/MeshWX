@@ -321,7 +321,9 @@ class Transport:
 @dataclass
 class QueueItem:
     text: str
-    on_result: object = None   # optional callable(ok: bool) invoked after the send
+    on_test: bool = False      # False = live channel (weather), True = test channel (IPAWS)
+    log_tx: bool = True        # write the weather transmit_log (False for IPAWS -- logged separately)
+    on_result: object = None   # optional callable(ok: bool, err: str) invoked after the send
 
 
 def _build_transports(db) -> dict:
@@ -364,7 +366,8 @@ class TransmitManager:
     def __init__(self, db):
         self._db = db
         self._transports = _build_transports(db)
-        self._queue: deque[QueueItem] = deque(maxlen=QUEUE_MAX)
+        self._queue: deque[QueueItem] = deque(maxlen=QUEUE_MAX)        # high: weather/live
+        self._queue_low: deque[QueueItem] = deque(maxlen=QUEUE_MAX)    # low: IPAWS/test
         self._queue_event = asyncio.Event()
         self._lock = asyncio.Lock()
         self._worker_task: asyncio.Task | None = None
@@ -477,28 +480,36 @@ class TransmitManager:
 
     # ---- sending --------------------------------------------------------
     def enqueue(self, text: str, channel: int | None = None, on_result=None) -> bool:
-        """Queue an automated transmission (fanned out to all enabled transports).
-        The channel arg is ignored - each transport uses its own configured channel.
-        on_result(ok) is invoked after the send so the caller learns the REAL
-        outcome (verified sent on a radio, or failed on all) instead of assuming
-        a queued message was delivered."""
-        dropped = len(self._queue) == self._queue.maxlen
-        if dropped and on_result is not None:
-            # The alert we are about to drop never gets a send: report it failed so
+        """Queue a weather alert (HIGH priority, live channel). on_result(ok, err)
+        fires after the send with the REAL verified outcome."""
+        return self._enqueue(self._queue, text, on_test=False, log_tx=True,
+                             on_result=on_result)
+
+    def enqueue_ipaws(self, text: str, on_test: bool = False, on_result=None) -> bool:
+        """Queue an IPAWS alert (LOW priority: weather always sends first). Real
+        alerts go on the live channel (on_test=False); test/exercise messages go
+        on the test channel (on_test=True). Not written to the weather transmit_log."""
+        return self._enqueue(self._queue_low, text, on_test=on_test, log_tx=False,
+                             on_result=on_result)
+
+    def _enqueue(self, lane, text, on_test, log_tx, on_result) -> bool:
+        dropped = len(lane) == lane.maxlen
+        if dropped:
+            # The item we are about to drop never gets a send: report it failed so
             # the caller does not record it as delivered.
-            oldest = self._queue[0] if self._queue else None
+            oldest = lane[0] if lane else None
             if oldest is not None and oldest.on_result is not None:
-                self._safe_result(oldest.on_result, False)
-        self._queue.append(QueueItem(text=text, on_result=on_result))
+                self._safe_result(oldest.on_result, False, "dropped (queue full)")
+        lane.append(QueueItem(text=text, on_test=on_test, log_tx=log_tx, on_result=on_result))
         self._queue_event.set()
         if dropped:
             logger.warning("transmit queue full; dropped oldest")
             self._db.add_event("WARN", "transmit queue full; dropped oldest message")
         return not dropped
 
-    def _safe_result(self, cb, ok: bool) -> None:
+    def _safe_result(self, cb, ok: bool, err: str = "") -> None:
         try:
-            r = cb(ok)
+            r = cb(ok, err)
             if asyncio.iscoroutine(r):
                 asyncio.create_task(r)
         except Exception:
@@ -692,10 +703,29 @@ class TransmitManager:
                 logger.info("resent via %s on ch %d", t.name, channel)
             return ok, ("" if ok else err)
 
+    async def _transmit_item(self, item: QueueItem) -> tuple[bool, str]:
+        """Send one queued item on the right channel (live vs test), verified per
+        radio. Weather items also write the transmit_log; IPAWS items do not."""
+        blen = len(item.text.encode())
+        any_ok, last = False, ""
+        async with self._lock:
+            for t in self._transports.values():
+                if not t.enabled:
+                    continue
+                ch = t.test_channel if item.on_test else t.channel
+                ok, err = await self._try_send(t, item.text, ch)
+                if item.log_tx:
+                    self._db.add_transmit_log(ch, blen, ok, item.text, False,
+                                              error=("" if ok else err), transport=t.name)
+                any_ok = any_ok or ok
+                if not ok:
+                    last = err
+        return any_ok, ("" if any_ok else last)
+
     async def _worker(self) -> None:
         first = True
         while not self._stopped:
-            if not self._queue:
+            if not self._queue and not self._queue_low:
                 self._queue_event.clear()
                 try:
                     await self._queue_event.wait()
@@ -705,14 +735,16 @@ class TransmitManager:
                 continue
             if not first:
                 try:
-                    await asyncio.sleep(BURST_GAP_SECONDS)
+                    await asyncio.sleep(BURST_GAP_SECONDS)   # pace EVERY send, both lanes
                 except asyncio.CancelledError:
                     return
-            item = self._queue.popleft()
+            # Weather (high) always drains before IPAWS (low), so a real warning
+            # never waits behind a backlog of secondary alerts.
+            item = self._queue.popleft() if self._queue else self._queue_low.popleft()
             try:
-                ok = await self._send_all(item.text, manual=False)
+                ok, err = await self._transmit_item(item)
                 if item.on_result is not None:
-                    self._safe_result(item.on_result, ok)
+                    self._safe_result(item.on_result, ok, err)
             except asyncio.CancelledError:
                 raise
             except Exception:

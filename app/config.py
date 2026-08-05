@@ -102,3 +102,37 @@ BURST_GAP_SECONDS = 30
 REPEAT_GAP_SECONDS = 5   # gap between repeated copies of the same alert
 QUEUE_MAX = 20
 STATE_EXPIRY_HOURS = 48
+
+# IPAWS (FEMA) public feed. Separate, experimental pipeline (VM only for now):
+# re-broadcasts non-weather alerts on the TEST channel. FEMA asks for polling no
+# more often than every 2 minutes -- enforced as a hard floor.
+IPAWS_BASE_URL = "https://apps.fema.gov/IPAWSOPEN_EAS_SERVICE/rest"
+IPAWS_PATH = "public"                     # public feed (weather senders filtered out in code)
+IPAWS_POLL_SECONDS = 120                  # >= 120: never poll FEMA more often than every 2 min
+IPAWS_POLL_FLOOR = 120                    # hard minimum, do not go below
+IPAWS_LOOKBACK_SECONDS = 600              # first poll window on startup
+# Senders whose alerts we DROP (NWS weather already goes out via the NWS pipeline).
+IPAWS_WEATHER_SENDER_HINTS = ("noaa.gov", "nws")
+# IPAWS DMOPEN "proficiency demonstration" messages arrive as status=Actual but
+# are NOT real emergencies (COGs sending them to prove their system works).
+# Drop anything whose event/identifier matches these (case-insensitive substrings).
+IPAWS_DEMO_PATTERNS = ("live_data", "proficiency", "demonstration", "dmopen",
+                       "external (", "external_(")
+
+# IPAWS non-weather alert categories the user can choose to broadcast (like the
+# NOAA event filter). Each is (key, label, keyword-substrings matched against the
+# alert's event, case-insensitive). "other" is the catch-all for anything else.
+IPAWS_EVENT_TYPES = [
+    ("amber",     "AMBER / Child abduction",   ["amber", "child abduction"]),
+    ("civil",     "Civil danger / emergency",  ["civil danger", "civil emergency"]),
+    ("evacuation","Evacuation",                ["evacuation", "evacuate"]),
+    ("shelter",   "Shelter in place",          ["shelter in place", "shelter-in-place"]),
+    ("fire",      "Fire",                       ["fire warning", "wildfire", "fire"]),
+    ("hazmat",    "Hazardous materials",       ["hazardous material", "hazmat", "chemical"]),
+    ("law",       "Law enforcement",           ["law enforcement", "blue alert"]),
+    ("local",     "Local area emergency",      ["local area emergency"]),
+    ("outage",    "911 / utility outage",      ["911", "telephone outage", "utility"]),
+    ("nuclear",   "Nuclear / radiological",    ["nuclear", "radiological", "radiation"]),
+    ("water",     "Water / boil-water",        ["boil water", "boil-water", "water advisory"]),
+    ("other",     "Other public safety",       []),
+]

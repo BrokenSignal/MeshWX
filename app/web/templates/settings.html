@@ -129,6 +129,24 @@
   </script>
 
   <div class="panel">
+    <h3>IPAWS (FEMA)</h3>
+    <p class="hint">Broadcasts public safety alerts from FEMA's IPAWS (AMBER Alerts, civil
+      emergencies, local emergency management) to your mesh, alongside NOAA weather. See the
+      <a href="/ipaws">IPAWS History</a> page.</p>
+    <label class="chk"><input type="checkbox" name="ipaws_enabled" {% if ipaws_enabled %}checked{% endif %}>
+      <b>Enable IPAWS feed</b></label>
+    <label class="chk" style="margin-top:8px;"><input type="checkbox" name="ipaws_send_tests" {% if ipaws_send_tests %}checked{% endif %}>
+      <span>Also broadcast IPAWS <b>test &amp; exercise</b> messages (tagged <code>[IPAWS TEST]</code>).
+      Handy for confirming the mesh works during quiet stretches.</span></label>
+    <span class="fld-lbl" style="margin-top:12px;">Alert types to broadcast</span>
+    <div class="checkgrid">
+      {% for key, label, kw in ipaws_event_types %}
+      <label class="chk"><input type="checkbox" name="ipaws_events" value="{{ key }}" {% if key in ipaws_selected %}checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
     <h3>NOAA</h3>
     <div class="row">
       <div><label>Poll interval (seconds, min {{ min_interval }})</label>
