@@ -26,6 +26,13 @@ from .config import (IPAWS_BASE_URL, IPAWS_PATH, IPAWS_POLL_SECONDS,
                      IPAWS_EVENT_TYPES, MAX_PAYLOAD_BYTES)
 
 
+def _sender_org(sender: str) -> str:
+    """Never expose a personal email. IPAWS senders are often an individual's
+    address (e.g. rwhite@county.gov); keep only the issuing org (the domain)."""
+    s = (sender or "").strip()
+    return s.rsplit("@", 1)[-1] if "@" in s else s
+
+
 def _category(event: str) -> str:
     """Map an IPAWS event name to one of the IPAWS_EVENT_TYPES keys."""
     low = (event or "").lower()
@@ -210,7 +217,7 @@ class IpawsPoller:
             low = sender.lower()
             is_weather = any(h in low for h in IPAWS_WEATHER_SENDER_HINTS)
             out.append({
-                "identifier": g("identifier"), "sender": sender, "sent": g("sent"),
+                "identifier": g("identifier"), "sender": _sender_org(sender), "sent": g("sent"),
                 "status": g("status"), "msg_type": g("msgType"),
                 "event": event, "area": area, "headline": headline,
                 "description": description, "instruction": instruction,
