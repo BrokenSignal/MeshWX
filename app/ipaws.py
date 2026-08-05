@@ -138,8 +138,17 @@ class IpawsPoller:
             else:
                 continue                      # System, or tests when the toggle is off
             if a["msg_type"] == "Cancel":
-                # Cancels matter (e.g. lifting a shelter-in-place). Resolve what is
-                # being cancelled; log-only if unidentifiable.
+                # Cancels matter (e.g. lifting a shelter-in-place) but must obey the
+                # SAME area lockdown as alerts -- otherwise we rebroadcast cancels
+                # from all over the country on the live channel. In-area only if the
+                # cancel's own geocodes cover our zones, or it references an IPAWS
+                # alert we already stored (those are area-gated before storage).
+                if not self._cancel_in_area(a, zones):
+                    self._db.add_ipaws(a["identifier"], a["sender"], a["event"] or "Cancel",
+                                       a["area"], a["headline"], a["msg_type"], a["status"],
+                                       a["sent"], "", transmitted=False, error="out of area")
+                    continue
+                # Resolve what is being cancelled; log-only if unidentifiable.
                 text = self._cancel_text(a)
                 event = a["event"] or "Cancel"
                 if text is None:
@@ -232,6 +241,23 @@ class IpawsPoller:
             if ok:
                 self.status.transmitted += 1
         return cb
+
+    def _cancel_in_area(self, a: dict, zones: set) -> bool:
+        """A Cancel is in-area only if its own UGC geocodes intersect the user's
+        configured zones, or -- when it carries no usable geocode -- if it
+        references an IPAWS alert we previously stored. Alert/Update rows are only
+        stored AFTER passing the area lockdown, so their presence proves in-area.
+        No zones configured => nothing is in-area (mirrors the Alert/Update gate)."""
+        if not zones:
+            return False
+        if a["ugc"]:
+            return bool(set(a["ugc"]) & zones)
+        for ref in _ref_identifiers(a["references"]):
+            row = self._db.get_ipaws(ref)
+            if row is not None and (row["msg_type"] in ("Alert", "Update")
+                                    or row["transmitted"]):
+                return True
+        return False
 
     def _cancel_text(self, a: dict):
         """Build a mesh message for a Cancel. Cancels often have no info block, so
