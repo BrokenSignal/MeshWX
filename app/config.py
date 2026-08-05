@@ -99,6 +99,14 @@ POLL_INTERVAL_MIN = 60
 POLL_HARD_TIMEOUT = 180
 MAX_PAYLOAD_BYTES = 195
 BURST_GAP_SECONDS = 30
+
+# Where this app lives, for the "Check for updates" button in Settings. The
+# check hits GitHub's public releases API (unauthenticated) and compares the
+# latest published (non-prerelease) tag against the running __version__.
+GITHUB_REPO = "BrokenSignal/MeshWX"
+GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/%s/releases/latest" % GITHUB_REPO
+GITHUB_RELEASES_URL = "https://github.com/%s/releases" % GITHUB_REPO
+
 REPEAT_GAP_SECONDS = 5   # gap between repeated copies of the same alert
 QUEUE_MAX = 20
 STATE_EXPIRY_HOURS = 48

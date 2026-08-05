@@ -170,4 +170,18 @@
 
   <button type="submit">Save settings</button>
 </form>
+
+<div class="panel" style="margin-top:18px;">
+  <h3>About &amp; updates</h3>
+  <div class="row" style="align-items:center;">
+    <div>MeshWX version <b>v{{ version }}</b></div>
+    <div style="text-align:right;">
+      <button type="button" class="secondary"
+              hx-get="/settings/check-updates" hx-target="#update-result"
+              hx-swap="innerHTML" hx-indicator="#update-spin">Check for updates</button>
+      <span id="update-spin" class="htmx-indicator">checking&hellip;</span>
+    </div>
+  </div>
+  <div id="update-result" style="margin-top:12px;"></div>
+</div>
 {% endblock %}

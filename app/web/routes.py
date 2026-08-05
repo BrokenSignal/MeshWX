@@ -1,6 +1,7 @@
 """Web UI routes (server-rendered templates + htmx partials)."""
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 import datetime
@@ -10,7 +11,9 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 import httpx
 
-from ..config import MAX_PAYLOAD_BYTES, POLL_INTERVAL_MIN, IPAWS_EVENT_TYPES
+from .. import __version__
+from ..config import (MAX_PAYLOAD_BYTES, POLL_INTERVAL_MIN, IPAWS_EVENT_TYPES,
+                      GITHUB_LATEST_RELEASE_API, GITHUB_RELEASES_URL)
 from ..serial_discovery import list_all_ports
 
 
@@ -49,7 +52,8 @@ def render(request: Request, name: str, **ctx):
         tz = ""   # fall back to this machine's local time
     return TEMPLATES.TemplateResponse(
         request, name,
-        {"max_bytes": MAX_PAYLOAD_BYTES, "tz": tz, "disp_label": DISP_LABELS, **ctx},
+        {"max_bytes": MAX_PAYLOAD_BYTES, "tz": tz, "disp_label": DISP_LABELS,
+         "version": __version__, **ctx},
     )
 
 
@@ -384,6 +388,55 @@ async def settings_counties(request: Request, state: str = ""):
 
 
 # ---- settings ----------------------------------------------------------
+def _parse_version(v: str) -> tuple:
+    """Leading numeric dotted parts of a version tag as an int tuple, e.g.
+    'v1.2.10' -> (1, 2, 10). Stops at the first non-numeric chunk so a
+    pre-release suffix ('1.2.0-rc1') compares on its numeric core (1, 2, 0)."""
+    core = re.split(r"[-+ ]", (v or "").strip().lstrip("vV"), maxsplit=1)[0]
+    parts = []
+    for chunk in core.split("."):
+        if chunk.isdigit():
+            parts.append(int(chunk))
+        else:
+            break
+    return tuple(parts)
+
+
+def _is_newer(latest: str, current: str) -> bool:
+    lt, cur = _parse_version(latest), _parse_version(current)
+    if not lt:
+        return False
+    n = max(len(lt), len(cur))
+    return lt + (0,) * (n - len(lt)) > cur + (0,) * (n - len(cur))
+
+
+@router.get("/settings/check-updates", response_class=HTMLResponse)
+async def check_updates(request: Request):
+    """Compare the running version against the latest GitHub release. Server-side
+    fetch (no CORS/CSP issues), read-only, gracefully degrades when offline."""
+    ctx = {"current": __version__, "latest": None,
+           "url": GITHUB_RELEASES_URL, "state": "error", "detail": ""}
+    try:
+        async with httpx.AsyncClient(
+                timeout=10,
+                headers={"User-Agent": "MeshWX-update-check",
+                         "Accept": "application/vnd.github+json"}) as client:
+            r = await client.get(GITHUB_LATEST_RELEASE_API)
+        if r.status_code == 200:
+            data = r.json()
+            ctx["latest"] = (data.get("tag_name") or "").lstrip("vV")
+            ctx["url"] = data.get("html_url") or GITHUB_RELEASES_URL
+            ctx["state"] = "update" if _is_newer(ctx["latest"], __version__) else "current"
+        elif r.status_code == 404:
+            ctx["state"] = "current"       # repo has no published releases yet
+            ctx["detail"] = "No releases published yet."
+        else:
+            ctx["detail"] = "GitHub returned HTTP %d." % r.status_code
+    except Exception:
+        ctx["detail"] = "Could not reach GitHub. Check this machine's connection."
+    return render(request, "_update_check.html", **ctx)
+
+
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
     db = _db(request)
